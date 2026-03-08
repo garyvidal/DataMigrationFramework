@@ -1,0 +1,23 @@
+# Build output
+target/
+out/
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.classpath
+.project
+.settings/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment / secrets
+*.properties.local
+application-local.yml
