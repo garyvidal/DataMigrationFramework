@@ -4,6 +4,8 @@ import lombok.Data;
 
 @Data
 public class XmlColumnMapping {
+    /** Stable UUID — persists across renames. */
+    String id;
     String sourceColumn;
     String xmlName;
     /** XSD type string, e.g. "xs:string", "xs:integer". */

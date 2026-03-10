@@ -10,6 +10,7 @@ import java.util.Map;
 
 @Data
 public class Project {
+    String id;
     String name;
     String version;
     String connectionName;

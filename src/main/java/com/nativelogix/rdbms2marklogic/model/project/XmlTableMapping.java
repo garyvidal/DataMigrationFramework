@@ -6,6 +6,8 @@ import java.util.List;
 
 @Data
 public class XmlTableMapping {
+    /** Stable UUID — persists across renames. */
+    String id;
     String sourceSchema;
     String sourceTable;
     String xmlName;
@@ -13,7 +15,7 @@ public class XmlTableMapping {
     String mappingType;
     boolean wrapInParent;
     String wrapperElementName;
-    /** InlineElement only: xmlName of the parent element this is nested inside. */
+    /** InlineElement only: id of the parent XmlTableMapping this is nested inside. */
     String parentRef;
     /** CUSTOM only: JavaScript function body. */
     String customFunction;

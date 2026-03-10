@@ -40,9 +40,9 @@ public class FileSystemProjectRepository implements ProjectRepository {
     }
 
     @Override
-    public Project save(String name, Project project) {
+    public Project save(String id, Project project) {
         try {
-            Path filePath = projectsDir.resolve(name + ".json");
+            Path filePath = projectsDir.resolve(id + ".json");
             objectMapper.writeValue(filePath.toFile(), project);
             return project;
         } catch (IOException e) {
@@ -51,9 +51,9 @@ public class FileSystemProjectRepository implements ProjectRepository {
     }
 
     @Override
-    public Optional<Project> findByName(String name) {
+    public Optional<Project> findById(String id) {
         try {
-            Path filePath = projectsDir.resolve(name + ".json");
+            Path filePath = projectsDir.resolve(id + ".json");
             if (Files.exists(filePath)) {
                 Project project = objectMapper.readValue(filePath.toFile(), Project.class);
                 return Optional.of(project);
@@ -86,9 +86,9 @@ public class FileSystemProjectRepository implements ProjectRepository {
     }
 
     @Override
-    public void delete(String name) {
+    public void delete(String id) {
         try {
-            Path filePath = projectsDir.resolve(name + ".json");
+            Path filePath = projectsDir.resolve(id + ".json");
             Files.deleteIfExists(filePath);
         } catch (IOException e) {
             throw new RuntimeException("Failed to delete project: " + e.getMessage(), e);
@@ -96,8 +96,8 @@ public class FileSystemProjectRepository implements ProjectRepository {
     }
 
     @Override
-    public boolean exists(String name) {
-        Path filePath = projectsDir.resolve(name + ".json");
+    public boolean exists(String id) {
+        Path filePath = projectsDir.resolve(id + ".json");
         return Files.exists(filePath);
     }
 }
