@@ -18,7 +18,7 @@ import java.util.Map;
  * FK relationships first, then falling back to user-defined synthetic joins.
  */
 @Component
-public class JoinResolver {
+public class  JoinResolver {
 
     /**
      * Result of a join resolution: which column on the parent side and which column

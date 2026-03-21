@@ -3,6 +3,7 @@ package com.nativelogix.rdbms2marklogic.service.generate;
 
 import com.nativelogix.rdbms2marklogic.model.project.NamingCase;
 import com.nativelogix.rdbms2marklogic.model.project.XmlColumnMapping;
+import com.nativelogix.rdbms2marklogic.model.project.XmlNamespace;
 import com.nativelogix.rdbms2marklogic.model.project.XmlTableMapping;
 import com.nativelogix.rdbms2marklogic.util.CaseConverter;
 import org.springframework.stereotype.Component;
@@ -35,10 +36,15 @@ import java.util.Map;
  * plus the recursively-queried inline children for that row. This allows
  * {@code InlineElement} mappings to be nested inside the correct parent element at
  * any depth, matching the structure shown in the UI XML Preview.</p>
+ *
+ * <p>If the project defines XML namespaces, all {@code xmlns:prefix="uri"} declarations
+ * are emitted on the root element, and any mapping whose {@code namespacePrefix} is set
+ * will produce prefixed element/attribute names (e.g. {@code <dc:title>}).</p>
  */
 @Component
 public class XmlDocumentBuilder {
 
+    private static final String XMLNS_NS = "http://www.w3.org/2000/xmlns/";
     private static final DateTimeFormatter ISO_DATE = DateTimeFormatter.ISO_LOCAL_DATE;
     private static final DateTimeFormatter ISO_DATETIME = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 
@@ -61,19 +67,40 @@ public class XmlDocumentBuilder {
      * @param rootRow      column name → value map for the root row
      * @param childData    root-level child mappings → their MappedRows (with inline children attached)
      * @param casing       naming convention to apply to xmlName values (null = use as-is)
+     * @param namespaces   project-level namespace declarations (may be null or empty)
      * @return pretty-printed XML string
      */
     public String build(XmlTableMapping rootMapping,
                         Map<String, Object> rootRow,
                         Map<XmlTableMapping, List<MappedRow>> childData,
-                        NamingCase casing) throws ParserConfigurationException, TransformerException {
+                        NamingCase casing,
+                        List<XmlNamespace> namespaces) throws ParserConfigurationException, TransformerException {
 
-        Document doc = DocumentBuilderFactory.newInstance().newDocumentBuilder().newDocument();
+        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        factory.setNamespaceAware(true);
+        Document doc = factory.newDocumentBuilder().newDocument();
 
-        Element rootEl = doc.createElement(applyCase(rootMapping.getXmlName(), casing));
+        // Build namespace URI lookup: prefix → uri
+        Map<String, String> nsMap = buildNsMap(namespaces);
+
+        Element rootEl = createElement(doc, rootMapping.getNamespacePrefix(), applyCase(rootMapping.getXmlName(), casing), nsMap);
         doc.appendChild(rootEl);
 
-        applyColumns(doc, rootEl, rootMapping.getColumns(), rootRow);
+        // Declare all project namespaces on the root element
+        if (namespaces != null) {
+            for (XmlNamespace ns : namespaces) {
+                if (ns.getPrefix() == null || ns.getUri() == null) continue;
+                if (ns.getPrefix().isBlank()) {
+                    // Default namespace: xmlns="uri"
+                    rootEl.setAttributeNS(XMLNS_NS, "xmlns", ns.getUri());
+                } else {
+                    // Prefixed namespace: xmlns:prefix="uri"
+                    rootEl.setAttributeNS(XMLNS_NS, "xmlns:" + ns.getPrefix(), ns.getUri());
+                }
+            }
+        }
+
+        applyColumns(doc, rootEl, rootMapping.getColumns(), rootRow, nsMap);
 
         if (childData != null) {
             for (Map.Entry<XmlTableMapping, List<MappedRow>> entry : childData.entrySet()) {
@@ -89,9 +116,9 @@ public class XmlDocumentBuilder {
                 }
 
                 for (MappedRow mr : mappedRows) {
-                    Element childEl = doc.createElement(childMapping.getXmlName());
-                    applyColumns(doc, childEl, childMapping.getColumns(), mr.row());
-                    buildInlineChildren(doc, childEl, mr.inlineChildren());
+                    Element childEl = createElement(doc, childMapping.getNamespacePrefix(), childMapping.getXmlName(), nsMap);
+                    applyColumns(doc, childEl, childMapping.getColumns(), mr.row(), nsMap);
+                    buildInlineChildren(doc, childEl, mr.inlineChildren(), nsMap);
                     parent.appendChild(childEl);
                 }
             }
@@ -107,7 +134,8 @@ public class XmlDocumentBuilder {
      * Each inline mapping produces its own XML element nested inside the parent.
      */
     private void buildInlineChildren(Document doc, Element parentEl,
-                                     Map<XmlTableMapping, List<MappedRow>> inlineData) {
+                                     Map<XmlTableMapping, List<MappedRow>> inlineData,
+                                     Map<String, String> nsMap) {
         if (inlineData == null || inlineData.isEmpty()) return;
 
         for (Map.Entry<XmlTableMapping, List<MappedRow>> entry : inlineData.entrySet()) {
@@ -115,9 +143,9 @@ public class XmlDocumentBuilder {
             List<MappedRow> rows = entry.getValue();
 
             for (MappedRow mr : rows) {
-                Element inlineEl = doc.createElement(mapping.getXmlName());
-                applyColumns(doc, inlineEl, mapping.getColumns(), mr.row());
-                buildInlineChildren(doc, inlineEl, mr.inlineChildren());
+                Element inlineEl = createElement(doc, mapping.getNamespacePrefix(), mapping.getXmlName(), nsMap);
+                applyColumns(doc, inlineEl, mapping.getColumns(), mr.row(), nsMap);
+                buildInlineChildren(doc, inlineEl, mr.inlineChildren(), nsMap);
                 parentEl.appendChild(inlineEl);
             }
         }
@@ -125,7 +153,8 @@ public class XmlDocumentBuilder {
 
     private void applyColumns(Document doc, Element parent,
                               List<XmlColumnMapping> columns,
-                              Map<String, Object> row) {
+                              Map<String, Object> row,
+                              Map<String, String> nsMap) {
         if (columns == null) return;
 
         for (XmlColumnMapping col : columns) {
@@ -136,16 +165,52 @@ public class XmlDocumentBuilder {
 
             String value = formatValue(rawValue, col.getXmlType());
             String name  = col.getXmlName();
+            String prefix = col.getNamespacePrefix();
 
             if ("ElementAttribute".equals(col.getMappingType())) {
-                parent.setAttribute(name, value);
+                if (prefix != null && !prefix.isBlank()) {
+                    String uri = nsMap.get(prefix);
+                    if (uri != null) {
+                        parent.setAttributeNS(uri, prefix + ":" + name, value);
+                    } else {
+                        parent.setAttribute(name, value);
+                    }
+                } else {
+                    parent.setAttribute(name, value);
+                }
             } else {
                 // Default: Element
-                Element el = doc.createElement(name);
+                Element el = createElement(doc, prefix, name, nsMap);
                 el.setTextContent(value);
                 parent.appendChild(el);
             }
         }
+    }
+
+    /**
+     * Creates an element, using the namespace URI if a known prefix is provided.
+     * Falls back to a plain element if prefix is null/blank or not in nsMap.
+     */
+    private Element createElement(Document doc, String prefix, String localName, Map<String, String> nsMap) {
+        if (prefix != null && !prefix.isBlank()) {
+            String uri = nsMap.get(prefix);
+            if (uri != null) {
+                return doc.createElementNS(uri, prefix + ":" + localName);
+            }
+        }
+        return doc.createElement(localName);
+    }
+
+    /** Build a prefix → URI lookup from the namespace list. */
+    private Map<String, String> buildNsMap(List<XmlNamespace> namespaces) {
+        if (namespaces == null || namespaces.isEmpty()) return Map.of();
+        Map<String, String> map = new java.util.LinkedHashMap<>();
+        for (XmlNamespace ns : namespaces) {
+            if (ns.getPrefix() != null && ns.getUri() != null) {
+                map.put(ns.getPrefix(), ns.getUri());
+            }
+        }
+        return map;
     }
 
     /** Format a JDBC value to a string appropriate for the declared XSD type. */

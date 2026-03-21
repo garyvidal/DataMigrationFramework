@@ -21,5 +21,7 @@ public class XmlTableMapping {
     String customFunction;
     /** CUSTOM only: XSD return type, e.g. "xs:string". */
     String xmlType;
+    /** Optional namespace prefix for this element, e.g. "dc". Must be declared in ProjectMapping.namespaces. */
+    String namespacePrefix;
     List<XmlColumnMapping> columns;
 }

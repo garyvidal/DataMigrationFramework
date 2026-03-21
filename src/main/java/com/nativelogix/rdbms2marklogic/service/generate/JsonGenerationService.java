@@ -65,17 +65,17 @@ public class JsonGenerationService {
         JsonTableMapping rootMapping = docModel.getRoot();
         List<JsonTableMapping> allMappings = docModel.getElements() != null ? docModel.getElements() : List.of();
 
-        // Build index: parentRef id → InlineObject mappings
+        // Build index: parentRef id → inline mappings (both InlineObject and Array types with parentRef)
         Map<String, List<JsonTableMapping>> inlinesByParentId = new LinkedHashMap<>();
         for (JsonTableMapping m : allMappings) {
-            if ("InlineObject".equals(m.getMappingType()) && m.getParentRef() != null) {
+            if (m.getParentRef() != null && ("InlineObject".equals(m.getMappingType()) || "Array".equals(m.getMappingType()))) {
                 inlinesByParentId.computeIfAbsent(m.getParentRef(), k -> new ArrayList<>()).add(m);
             }
         }
 
-        // Root-level Array mappings only (InlineObjects are handled recursively)
+        // Root-level mappings only (InlineObjects and InlineArrays are handled recursively)
         List<JsonTableMapping> rootLevelMappings = allMappings.stream()
-                .filter(m -> !"InlineObject".equals(m.getMappingType()))
+                .filter(m -> m.getParentRef() == null)
                 .toList();
 
         // 4. Query and build

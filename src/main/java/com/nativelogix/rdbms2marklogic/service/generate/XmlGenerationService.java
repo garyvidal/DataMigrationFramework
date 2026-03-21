@@ -6,6 +6,7 @@ import com.nativelogix.rdbms2marklogic.model.generate.XmlPreviewResult;
 import com.nativelogix.rdbms2marklogic.model.project.DocumentModel;
 import com.nativelogix.rdbms2marklogic.model.project.NamingCase;
 import com.nativelogix.rdbms2marklogic.model.project.Project;
+import com.nativelogix.rdbms2marklogic.model.project.XmlNamespace;
 import com.nativelogix.rdbms2marklogic.model.project.XmlTableMapping;
 import com.nativelogix.rdbms2marklogic.repository.FileSystemProjectRepository;
 import com.nativelogix.rdbms2marklogic.service.JDBCConnectionService;
@@ -74,6 +75,7 @@ public class XmlGenerationService {
         Connection.ConnectionType dbType = conn.getType() != null ? conn.getType() : Connection.ConnectionType.Postgres;
 
         NamingCase casing = project.getSettings() != null ? project.getSettings().getDefaultCasing() : null;
+        List<XmlNamespace> namespaces = project.getMapping().getNamespaces();
 
         XmlTableMapping rootMapping = docModel.getRoot();
         List<XmlTableMapping> allMappings = docModel.getElements() != null ? docModel.getElements() : List.of();
@@ -136,7 +138,7 @@ public class XmlGenerationService {
 
                     // Build XML document
                     try {
-                        String xml = xmlDocumentBuilder.build(rootMapping, rootRow, childData, casing);
+                        String xml = xmlDocumentBuilder.build(rootMapping, rootRow, childData, casing, namespaces);
                         result.getDocuments().add(xml);
                     } catch (Exception e) {
                         log.error("XML build failed for row {}: {}", result.getTotalRows(), e.getMessage(), e);

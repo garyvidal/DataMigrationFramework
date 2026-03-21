@@ -13,4 +13,6 @@ public class XmlColumnMapping {
     /** "Element", "ElementAttribute", or "CUSTOM". */
     String mappingType;
     String customFunction;
+    /** Optional namespace prefix for this element or attribute, e.g. "dc". Must be declared in ProjectMapping.namespaces. */
+    String namespacePrefix;
 }

@@ -60,7 +60,7 @@ public class JsonDocumentBuilder {
                 JsonTableMapping childMapping = entry.getKey();
                 List<MappedRow> mappedRows   = entry.getValue();
 
-                String key = applyCase(childMapping.getJsonName(), casing);
+                String key = childMapping.getJsonName();
 
                 if ("Array".equals(childMapping.getMappingType())) {
                     ArrayNode arrayNode = root.putArray(key);
@@ -95,7 +95,7 @@ public class JsonDocumentBuilder {
         for (Map.Entry<JsonTableMapping, List<MappedRow>> entry : inlineData.entrySet()) {
             JsonTableMapping mapping = entry.getKey();
             List<MappedRow>  rows    = entry.getValue();
-            String key = applyCase(mapping.getJsonName(), casing);
+            String key = mapping.getJsonName();
 
             if ("Array".equals(mapping.getMappingType())) {
                 ArrayNode arrayNode = parentNode.putArray(key);
@@ -128,7 +128,7 @@ public class JsonDocumentBuilder {
             Object rawValue = row.get(col.getSourceColumn());
             if (rawValue == null) continue;
 
-            String key = applyCase(col.getJsonKey(), casing);
+            String key = col.getJsonKey();
             putTyped(node, key, rawValue, col.getJsonType());
         }
     }
@@ -158,16 +158,5 @@ public class JsonDocumentBuilder {
         if (value instanceof LocalDateTime ldt){ node.put(key, ldt.format(ISO_DATETIME)); return; }
 
         node.put(key, value.toString());
-    }
-
-    private String applyCase(String name, NamingCase namingCase) {
-        if (name == null || namingCase == null) return name;
-        CaseConverter.Case target = switch (namingCase) {
-            case CAMEL  -> CaseConverter.Case.CAMEL;
-            case PASCAL -> CaseConverter.Case.PASCAL;
-            case DASH   -> CaseConverter.Case.DASH;
-            default     -> CaseConverter.Case.SNAKE;
-        };
-        return CaseConverter.convert(name, CaseConverter.Case.SNAKE, target);
     }
 }
