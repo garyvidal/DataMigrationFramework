@@ -85,6 +85,17 @@
             <version>8.0.0</version>
             <scope>compile</scope>
         </dependency>
+        <!-- Spring Batch for large-scale data migration -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-batch</artifactId>
+        </dependency>
+        <!-- H2 in-memory database for Spring Batch metadata tables -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>runtime</scope>
+        </dependency>
     </dependencies>
 
     <build>
