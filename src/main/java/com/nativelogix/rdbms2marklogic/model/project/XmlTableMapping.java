@@ -17,6 +17,8 @@ public class XmlTableMapping {
     String wrapperElementName;
     /** InlineElement only: id of the parent XmlTableMapping this is nested inside. */
     String parentRef;
+    /** InlineElement only: when true, skip the wrapper element and embed columns directly into the parent. */
+    boolean embed;
     /** When multiple FKs exist between parent and child, specifies the FK column to use for joining. */
     String joinColumn;
     /** CUSTOM only: JavaScript function body. */

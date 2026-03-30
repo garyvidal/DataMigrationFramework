@@ -60,6 +60,16 @@ public class JsonDocumentBuilder {
                 JsonTableMapping childMapping = entry.getKey();
                 List<MappedRow> mappedRows   = entry.getValue();
 
+                // Embed: skip the wrapper key, apply properties directly to root
+                if (childMapping.isEmbed()) {
+                    if (!mappedRows.isEmpty()) {
+                        MappedRow mr = mappedRows.get(0);
+                        applyColumns(root, childMapping.getColumns(), mr.row(), casing);
+                        buildInlineChildren(root, mr.inlineChildren(), casing);
+                    }
+                    continue;
+                }
+
                 String key = childMapping.getJsonName();
 
                 if ("Array".equals(childMapping.getMappingType())) {
@@ -97,6 +107,17 @@ public class JsonDocumentBuilder {
         for (Map.Entry<JsonTableMapping, List<MappedRow>> entry : inlineData.entrySet()) {
             JsonTableMapping mapping = entry.getKey();
             List<MappedRow>  rows    = entry.getValue();
+
+            if (mapping.isEmbed()) {
+                // Embed: skip the wrapper key, apply properties directly to parentNode
+                if (!rows.isEmpty()) {
+                    MappedRow mr = rows.get(0);
+                    applyColumns(parentNode, mapping.getColumns(), mr.row(), casing);
+                    buildInlineChildren(parentNode, mr.inlineChildren(), casing);
+                }
+                continue;
+            }
+
             String key = mapping.getJsonName();
 
             if ("Array".equals(mapping.getMappingType())) {

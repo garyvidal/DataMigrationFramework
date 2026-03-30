@@ -107,6 +107,15 @@ public class XmlDocumentBuilder {
                 XmlTableMapping childMapping = entry.getKey();
                 List<MappedRow> mappedRows = entry.getValue();
 
+                // Embed: skip wrapper, apply columns directly to rootEl
+                if (childMapping.isEmbed()) {
+                    for (MappedRow mr : mappedRows) {
+                        applyColumns(doc, rootEl, childMapping.getColumns(), mr.row(), nsMap);
+                        buildInlineChildren(doc, rootEl, mr.inlineChildren(), nsMap);
+                    }
+                    continue;
+                }
+
                 Element parent = rootEl;
 
                 if (childMapping.isWrapInParent() && childMapping.getWrapperElementName() != null && !childMapping.getWrapperElementName().isBlank()) {
@@ -143,10 +152,16 @@ public class XmlDocumentBuilder {
             List<MappedRow> rows = entry.getValue();
 
             for (MappedRow mr : rows) {
-                Element inlineEl = createElement(doc, mapping.getNamespacePrefix(), mapping.getXmlName(), nsMap);
-                applyColumns(doc, inlineEl, mapping.getColumns(), mr.row(), nsMap);
-                buildInlineChildren(doc, inlineEl, mr.inlineChildren(), nsMap);
-                parentEl.appendChild(inlineEl);
+                if (mapping.isEmbed()) {
+                    // Embed: skip the wrapper element, apply columns directly to parentEl
+                    applyColumns(doc, parentEl, mapping.getColumns(), mr.row(), nsMap);
+                    buildInlineChildren(doc, parentEl, mr.inlineChildren(), nsMap);
+                } else {
+                    Element inlineEl = createElement(doc, mapping.getNamespacePrefix(), mapping.getXmlName(), nsMap);
+                    applyColumns(doc, inlineEl, mapping.getColumns(), mr.row(), nsMap);
+                    buildInlineChildren(doc, inlineEl, mr.inlineChildren(), nsMap);
+                    parentEl.appendChild(inlineEl);
+                }
             }
         }
     }
