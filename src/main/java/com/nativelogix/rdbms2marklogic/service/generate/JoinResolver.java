@@ -30,12 +30,12 @@ public class  JoinResolver {
      * A format-agnostic reference to a mapped table, used so that both XML and JSON
      * generation can share the same join resolution logic.
      */
-    public record SourceTableRef(String sourceSchema, String sourceTable, String id) {
+    public record SourceTableRef(String sourceSchema, String sourceTable, String id, String joinColumn) {
         public static SourceTableRef of(XmlTableMapping m) {
-            return new SourceTableRef(m.getSourceSchema(), m.getSourceTable(), m.getId());
+            return new SourceTableRef(m.getSourceSchema(), m.getSourceTable(), m.getId(), m.getJoinColumn());
         }
         public static SourceTableRef of(JsonTableMapping m) {
-            return new SourceTableRef(m.getSourceSchema(), m.getSourceTable(), m.getId());
+            return new SourceTableRef(m.getSourceSchema(), m.getSourceTable(), m.getId(), m.getJoinColumn());
         }
     }
 
@@ -83,8 +83,11 @@ public class  JoinResolver {
         DbTable parentTable = getDbTable(project, parent.sourceSchema(), parent.sourceTable());
         if (parentTable == null || parentTable.getRelationships() == null) return null;
 
+        String childFullName = child.sourceSchema() + "." + child.sourceTable();
         for (DbRelationship rel : parentTable.getRelationships()) {
-            if (child.sourceTable().equalsIgnoreCase(rel.getToTable())) {
+            if (toTableMatches(rel.getToTable(), child.sourceTable(), childFullName)) {
+                // If a specific FK column was requested, skip non-matching ones
+                if (child.joinColumn() != null && !child.joinColumn().equalsIgnoreCase(rel.getFromColumn())) continue;
                 return new JoinPath(rel.getFromColumn(), rel.getToColumn());
             }
         }
@@ -95,12 +98,26 @@ public class  JoinResolver {
         DbTable childTable = getDbTable(project, child.sourceSchema(), child.sourceTable());
         if (childTable == null || childTable.getRelationships() == null) return null;
 
+        String parentFullName = parent.sourceSchema() + "." + parent.sourceTable();
         for (DbRelationship rel : childTable.getRelationships()) {
-            if (parent.sourceTable().equalsIgnoreCase(rel.getToTable())) {
+            if (toTableMatches(rel.getToTable(), parent.sourceTable(), parentFullName)) {
+                // If a specific FK column was requested, skip non-matching ones
+                if (child.joinColumn() != null && !child.joinColumn().equalsIgnoreCase(rel.getFromColumn())) continue;
                 return new JoinPath(rel.getToColumn(), rel.getFromColumn());
             }
         }
         return null;
+    }
+
+    /**
+     * Matches a stored toTable value (which may be a bare name or a full dotted name)
+     * against a target table. Handles old data (bare names) and new data (full names).
+     */
+    private boolean toTableMatches(String toTable, String bareTableName, String fullTableName) {
+        if (toTable == null) return false;
+        return toTable.equalsIgnoreCase(bareTableName)
+            || toTable.equalsIgnoreCase(fullTableName)
+            || toTable.toLowerCase().endsWith("." + bareTableName.toLowerCase());
     }
 
     private JoinPath resolveViaSyntheticJoin(SourceTableRef parent, SourceTableRef child, Project project) {

@@ -71,12 +71,14 @@ public class JsonDocumentBuilder {
                         arrayNode.add(childObj);
                     }
                 } else {
-                    // InlineObject: single nested object (first row only)
+                    // InlineObject: single nested object (first row only); null when no matching row
                     if (!mappedRows.isEmpty()) {
                         MappedRow mr = mappedRows.get(0);
                         ObjectNode childObj = root.putObject(key);
                         applyColumns(childObj, childMapping.getColumns(), mr.row(), casing);
                         buildInlineChildren(childObj, mr.inlineChildren(), casing);
+                    } else {
+                        root.putNull(key);
                     }
                 }
             }
@@ -111,6 +113,8 @@ public class JsonDocumentBuilder {
                     ObjectNode obj = parentNode.putObject(key);
                     applyColumns(obj, mapping.getColumns(), mr.row(), casing);
                     buildInlineChildren(obj, mr.inlineChildren(), casing);
+                } else {
+                    parentNode.putNull(key);
                 }
             }
         }

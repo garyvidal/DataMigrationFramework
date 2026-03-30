@@ -6,6 +6,7 @@ import com.nativelogix.rdbms2marklogic.model.requests.SchemaAnalysisRequest;
 import com.nativelogix.rdbms2marklogic.repository.ConnectionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import schemacrawler.inclusionrule.RegularExpressionInclusionRule;
 import schemacrawler.schema.*;
 import schemacrawler.schemacrawler.*;
 import schemacrawler.tools.utility.SchemaCrawlerUtility;
@@ -24,7 +25,13 @@ public class SchemaService {
     private final PasswordEncryptionService encryptionService;
 
     public DbDatabase analyzeSchema(SchemaAnalysisRequest request) {
-        final LimitOptions limitOptions = LimitOptionsBuilder.builder().build();
+        final LimitOptions limitOptions = LimitOptionsBuilder.builder()
+                .tableTypes("TABLE,VIEW")
+                .includeSchemas(new RegularExpressionInclusionRule(
+                        "^(?i)(?!master$|tempdb$|model$|msdb$|dbo$).*"
+                ))
+                .build();
+
         final LoadOptions loadOptions = LoadOptionsBuilder
                 .builder()
                 .withSchemaInfoLevel(SchemaInfoLevelBuilder.standard())
@@ -43,6 +50,7 @@ public class SchemaService {
         for (final Schema schema : catalog.getSchemas()) {
             DbSchema dbSchema = new DbSchema();
             dbSchema.setName(schema.getName());
+            dbSchema.setFullName(schema.getFullName());
             Map<String, DbTable> tables = new LinkedHashMap<>();
             if (request.isIncludeTables()) {
                 List<Table> sortedTables = catalog.getTables(schema)
@@ -52,6 +60,7 @@ public class SchemaService {
                 for (final Table table : sortedTables) {
                     DbTable dbTable = new DbTable();
                     dbTable.setTableName(table.getName());
+                    dbTable.setFullName(table.getFullName());
                     dbTable.setSchema(schema.getName());
                     if (request.isIncludeColumns()) {
                         dbTable.setColumns(getColumns(table));
@@ -117,7 +126,15 @@ public class SchemaService {
         String database = connection.getDatabase();
         return switch (connection.getType()) {
             case MySql -> String.format("jdbc:mysql://%s:%d/%s", host, port, database);
-            case SqlServer -> String.format("jdbc:sqlserver://%s:%d;databaseName=%s", host, port, database);
+            case SqlServer -> {
+                StringBuilder url = new StringBuilder(
+                        String.format("jdbc:sqlserver://%s:%d;databaseName=%s", host, port, database));
+                if ("Windows".equals(connection.getAuthentication())) {
+                    url.append(";integratedSecurity=true");
+                }
+                url.append(";encrypt=true;trustServerCertificate=true");
+                yield url.toString();
+            }
             case Oracle -> String.format("jdbc:oracle:thin:@%s:%d:%s", host, port, database);
             default -> String.format("jdbc:postgresql://%s:%d/%s", host, port, database);
         };
@@ -129,7 +146,7 @@ public class SchemaService {
             for (ColumnReference ref : fk.getColumnReferences()) {
                 DbRelationship relationship = new DbRelationship();
                 relationship.setFromColumn(ref.getForeignKeyColumn().getName());
-                relationship.setToTable(ref.getPrimaryKeyColumn().getParent().getName());
+                relationship.setToTable(ref.getPrimaryKeyColumn().getParent().getFullName());
                 relationship.setToColumn(ref.getPrimaryKeyColumn().getName());
                 relationships.add(relationship);
             }
@@ -145,6 +162,7 @@ public class SchemaService {
                 .toList();
         for (final Column column : sortedColumns) {
             DbColumn dbColumn = new DbColumn();
+            dbColumn.setFullName(column.getFullName());
             dbColumn.setName(column.getName());
             dbColumn.setType(column.getType().getJavaSqlType().getName());
             dbColumn.setPosition(column.getOrdinalPosition());
@@ -158,6 +176,7 @@ public class SchemaService {
             Column refColumn = column.getReferencedColumn();
             if (refColumn != null && column.isPartOfForeignKey()) {
                 DbForeignKey fkey = new DbForeignKey();
+                fkey.setFullName(refColumn.getFullName());
                 fkey.setName(refColumn.getName());
                 dbColumn.setForeignKey(fkey);
             }

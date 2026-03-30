@@ -9,6 +9,8 @@ public class DeploymentJob {
     private String id;
     private String projectId;
     private String projectName;
+    private String sourceConnectionId;
+    private String sourceConnectionName;
     private String marklogicConnectionId;
     private String marklogicConnectionName;
     private String directoryPath;
@@ -32,6 +34,12 @@ public class DeploymentJob {
 
     public String getProjectName() { return projectName; }
     public void setProjectName(String projectName) { this.projectName = projectName; }
+
+    public String getSourceConnectionId() { return sourceConnectionId; }
+    public void setSourceConnectionId(String sourceConnectionId) { this.sourceConnectionId = sourceConnectionId; }
+
+    public String getSourceConnectionName() { return sourceConnectionName; }
+    public void setSourceConnectionName(String sourceConnectionName) { this.sourceConnectionName = sourceConnectionName; }
 
     public String getMarklogicConnectionId() { return marklogicConnectionId; }
     public void setMarklogicConnectionId(String marklogicConnectionId) { this.marklogicConnectionId = marklogicConnectionId; }

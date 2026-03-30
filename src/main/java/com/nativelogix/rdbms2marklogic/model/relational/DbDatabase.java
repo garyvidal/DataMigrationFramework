@@ -7,5 +7,6 @@ import java.util.Map;
 @Data
 public class DbDatabase {
    String name;
+   String fullName;
    Map<String, DbSchema> schemas;
 }

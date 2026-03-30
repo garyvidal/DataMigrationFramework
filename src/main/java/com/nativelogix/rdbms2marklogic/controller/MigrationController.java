@@ -1,22 +1,34 @@
 package com.nativelogix.rdbms2marklogic.controller;
 
 import com.nativelogix.rdbms2marklogic.model.migration.DeploymentJob;
+import com.nativelogix.rdbms2marklogic.model.migration.MigrationPreviewResult;
 import com.nativelogix.rdbms2marklogic.model.migration.MigrationProgress;
 import com.nativelogix.rdbms2marklogic.model.migration.MigrationRequest;
 import com.nativelogix.rdbms2marklogic.service.migration.MigrationJobService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
-@CrossOrigin(origins = "http://localhost:5173", allowedHeaders = "*",
-        methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.DELETE, RequestMethod.OPTIONS})
 public class MigrationController {
 
     private final MigrationJobService migrationJobService;
+
+    /** Preview row counts per table before running a migration */
+    @GetMapping("/v1/migration/preview/{projectId}")
+    public ResponseEntity<MigrationPreviewResult> preview(
+            @PathVariable String projectId,
+            @RequestParam(required = false) String connectionId) {
+        if (projectId == null || projectId.isBlank()) {
+            return ResponseEntity.badRequest().build();
+        }
+        return ResponseEntity.ok(migrationJobService.getPreview(projectId, connectionId));
+    }
 
     /** Start a new migration job */
     @PostMapping("/v1/migration/jobs")
@@ -50,5 +62,11 @@ public class MigrationController {
     public ResponseEntity<Void> deleteJob(@PathVariable String id) {
         migrationJobService.deleteJob(id);
         return ResponseEntity.noContent().build();
+    }
+
+    /** SSE stream: pushes MigrationProgress events at ~10% milestones; sends "complete" and closes on job end */
+    @GetMapping(value = "/v1/migration/jobs/{id}/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter streamProgress(@PathVariable String id) {
+        return migrationJobService.createSseEmitter(id);
     }
 }

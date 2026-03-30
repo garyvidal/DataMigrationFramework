@@ -89,7 +89,14 @@ public class JDBCConnectionService {
         }
 
         String host = connection.getUrl();
-        int port = connection.getPort() != null ? connection.getPort() : 0;
+        int port = connection.getPort() != null && connection.getPort() > 0
+                ? connection.getPort()
+                : switch (connection.getType()) {
+                    case SqlServer -> 1433;
+                    case MySql     -> 3306;
+                    case Oracle    -> 1521;
+                    default        -> 5432;
+                };
         String database = connection.getDatabase();
 
         return switch (connection.getType()) {
@@ -101,6 +108,7 @@ public class JDBCConnectionService {
                 if ("Windows".equals(connection.getAuthentication())) {
                     url.append(";integratedSecurity=true");
                 }
+                url.append(";encrypt=true;trustServerCertificate=true");
                 yield url.toString();
             }
 

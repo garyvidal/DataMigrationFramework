@@ -10,8 +10,6 @@ import java.time.OffsetDateTime;
 import java.util.List;
 
 @RestController
-@CrossOrigin(origins = "http://localhost:5173", allowedHeaders = "*",
-        methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.DELETE, RequestMethod.OPTIONS})
 public class ProjectController {
 
     @Autowired

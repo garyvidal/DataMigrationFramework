@@ -96,7 +96,8 @@ public class XmlGenerationService {
         // 4. Query and build
         try (java.sql.Connection jdbc = jdbcConnectionService.openJdbcConnection(conn)) {
 
-            String rootSql = sqlQueryBuilder.buildRootQuery(rootMapping, dbType, limit);
+            String rootWhereClause = lookupWhereClause(project, rootMapping.getSourceSchema(), rootMapping.getSourceTable());
+            String rootSql = sqlQueryBuilder.buildRootQuery(rootMapping, dbType, limit, rootWhereClause);
             log.debug("Root query: {}", rootSql);
 
             try (PreparedStatement rootStmt = jdbc.prepareStatement(rootSql);
@@ -133,6 +134,34 @@ public class XmlGenerationService {
                             result.getErrors().add("Join not found for child table '%s.%s': %s"
                                     .formatted(childMapping.getSourceSchema(), childMapping.getSourceTable(), e.getMessage()));
                             childData.put(childMapping, List.of());
+                        }
+                    }
+
+                    // InlineElement mappings that are direct children of root (parentRef = rootMapping.id)
+                    List<XmlTableMapping> rootDirectInlines =
+                            inlinesByParentId.getOrDefault(rootMapping.getId(), List.of());
+                    for (XmlTableMapping inlineMapping : rootDirectInlines) {
+                        try {
+                            JoinResolver.JoinPath joinPath = joinResolver.resolve(rootMapping, inlineMapping, project);
+
+                            Object parentValue = rootRow.get(joinPath.parentColumn());
+                            if (parentValue == null) {
+                                log.warn("Parent join column '{}' is null in root row — skipping inline '{}'",
+                                        joinPath.parentColumn(), inlineMapping.getXmlName());
+                                childData.put(inlineMapping, List.of());
+                                continue;
+                            }
+
+                            List<MappedRow> mappedRows = queryMappedRows(
+                                    jdbc, inlineMapping, joinPath.childColumn(), parentValue,
+                                    inlinesByParentId, project, result);
+                            childData.put(inlineMapping, mappedRows);
+
+                        } catch (IllegalArgumentException e) {
+                            log.warn("Join resolution failed for root inline '{}': {}", inlineMapping.getXmlName(), e.getMessage());
+                            result.getErrors().add("Join not found for inline table '%s.%s': %s"
+                                    .formatted(inlineMapping.getSourceSchema(), inlineMapping.getSourceTable(), e.getMessage()));
+                            childData.put(inlineMapping, List.of());
                         }
                     }
 
@@ -242,5 +271,14 @@ public class XmlGenerationService {
             row.put(meta.getColumnName(i), rs.getObject(i));
         }
         return row;
+    }
+
+    /** Looks up the WHERE clause for a table from the project's schema metadata. */
+    private String lookupWhereClause(Project project, String schema, String table) {
+        if (project.getSchemas() == null) return null;
+        var dbSchema = project.getSchemas().get(schema);
+        if (dbSchema == null || dbSchema.getTables() == null) return null;
+        var dbTable = dbSchema.getTables().get(table);
+        return dbTable != null ? dbTable.getWhereClause() : null;
     }
 }

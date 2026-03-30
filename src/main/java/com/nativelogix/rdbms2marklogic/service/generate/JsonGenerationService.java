@@ -81,8 +81,12 @@ public class JsonGenerationService {
         // 4. Query and build
         try (java.sql.Connection jdbc = jdbcConnectionService.openJdbcConnection(conn)) {
 
-            String rootSql = sqlQueryBuilder.buildRootQuery(rootMapping, dbType, limit);
+            String rootWhereClause = lookupWhereClause(project, rootMapping.getSourceSchema(), rootMapping.getSourceTable());
+            String rootSql = sqlQueryBuilder.buildRootQuery(rootMapping, dbType, limit, rootWhereClause);
             log.debug("JSON root query: {}", rootSql);
+
+            // Track null-FK skips per inline name to emit a single summary warning
+            Map<String, int[]> nullFkCounts = new LinkedHashMap<>();
 
             try (PreparedStatement rootStmt = jdbc.prepareStatement(rootSql);
                  ResultSet rootRs = rootStmt.executeQuery()) {
@@ -101,8 +105,7 @@ public class JsonGenerationService {
 
                             Object parentValue = rootRow.get(joinPath.parentColumn());
                             if (parentValue == null) {
-                                log.warn("Parent join column '{}' is null in root row — skipping child '{}'",
-                                        joinPath.parentColumn(), childMapping.getJsonName());
+                                nullFkCounts.computeIfAbsent(childMapping.getJsonName(), k -> new int[1])[0]++;
                                 childData.put(childMapping, List.of());
                                 continue;
                             }
@@ -120,6 +123,33 @@ public class JsonGenerationService {
                         }
                     }
 
+                    // InlineObject/Array mappings that are direct children of root (parentRef = rootMapping.id)
+                    List<JsonTableMapping> rootDirectInlines =
+                            inlinesByParentId.getOrDefault(rootMapping.getId(), List.of());
+                    for (JsonTableMapping inlineMapping : rootDirectInlines) {
+                        try {
+                            JoinResolver.JoinPath joinPath = joinResolver.resolve(rootMapping, inlineMapping, project);
+
+                            Object parentValue = rootRow.get(joinPath.parentColumn());
+                            if (parentValue == null) {
+                                nullFkCounts.computeIfAbsent(inlineMapping.getJsonName(), k -> new int[1])[0]++;
+                                childData.put(inlineMapping, List.of());
+                                continue;
+                            }
+
+                            List<MappedRow> mappedRows = queryMappedRows(
+                                    jdbc, inlineMapping, joinPath.childColumn(), parentValue,
+                                    inlinesByParentId, project, result);
+                            childData.put(inlineMapping, mappedRows);
+
+                        } catch (IllegalArgumentException e) {
+                            log.warn("Join resolution failed for root inline '{}': {}", inlineMapping.getJsonName(), e.getMessage());
+                            result.getErrors().add("Join not found for inline table '%s.%s': %s"
+                                    .formatted(inlineMapping.getSourceSchema(), inlineMapping.getSourceTable(), e.getMessage()));
+                            childData.put(inlineMapping, List.of());
+                        }
+                    }
+
                     try {
                         String json = jsonDocumentBuilder.build(rootMapping, rootRow, childData, casing);
                         result.getDocuments().add(json);
@@ -129,6 +159,10 @@ public class JsonGenerationService {
                     }
                 }
             }
+
+            nullFkCounts.forEach((name, count) ->
+                result.getErrors().add("'%s' was null for %d row%s — rendered as null in output"
+                        .formatted(name, count[0], count[0] == 1 ? "" : "s")));
 
         } catch (Exception e) {
             log.error("JSON preview generation failed for project {}: {}", projectId, e.getMessage(), e);
@@ -214,5 +248,14 @@ public class JsonGenerationService {
             row.put(meta.getColumnName(i), rs.getObject(i));
         }
         return row;
+    }
+
+    /** Looks up the WHERE clause for a table from the project's schema metadata. */
+    private String lookupWhereClause(Project project, String schema, String table) {
+        if (project.getSchemas() == null) return null;
+        var dbSchema = project.getSchemas().get(schema);
+        if (dbSchema == null || dbSchema.getTables() == null) return null;
+        var dbTable = dbSchema.getTables().get(table);
+        return dbTable != null ? dbTable.getWhereClause() : null;
     }
 }

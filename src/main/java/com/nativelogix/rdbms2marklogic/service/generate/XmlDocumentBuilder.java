@@ -83,7 +83,7 @@ public class XmlDocumentBuilder {
         // Build namespace URI lookup: prefix → uri
         Map<String, String> nsMap = buildNsMap(namespaces);
 
-        Element rootEl = createElement(doc, rootMapping.getNamespacePrefix(), applyCase(rootMapping.getXmlName(), casing), nsMap);
+        Element rootEl = createElement(doc, rootMapping.getNamespacePrefix(), rootMapping.getXmlName(), nsMap);
         doc.appendChild(rootEl);
 
         // Declare all project namespaces on the root element
@@ -238,18 +238,6 @@ public class XmlDocumentBuilder {
             }
         }
         return value.toString();
-    }
-
-    /** Apply the project's defaultCasing to an xmlName, if casing is set and the name is snake_case. */
-    private String applyCase(String xmlName, NamingCase namingCase) {
-        if (xmlName == null || namingCase == null) return xmlName;
-        CaseConverter.Case target = switch (namingCase) {
-            case CAMEL  -> CaseConverter.Case.CAMEL;
-            case PASCAL -> CaseConverter.Case.PASCAL;
-            case DASH   -> CaseConverter.Case.DASH;
-            default     -> CaseConverter.Case.SNAKE;
-        };
-        return CaseConverter.convert(xmlName, CaseConverter.Case.SNAKE, target);
     }
 
     private String serialize(Document doc) throws TransformerException {

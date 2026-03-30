@@ -16,5 +16,7 @@ public class JsonTableMapping {
     String mappingType;
     /** InlineObject only: id of the parent JsonTableMapping this is nested inside. */
     String parentRef;
+    /** When multiple FKs exist between parent and child, specifies the FK column to use for joining. */
+    String joinColumn;
     List<JsonColumnMapping> columns;
 }

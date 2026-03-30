@@ -7,6 +7,7 @@ import java.sql.JDBCType;
 @Data
 public class DbColumn {
     String name;
+    String fullName;
     String type;
     int position;
     boolean isSequence;

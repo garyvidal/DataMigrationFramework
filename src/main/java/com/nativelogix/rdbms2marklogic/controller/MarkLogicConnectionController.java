@@ -13,9 +13,6 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/v1/marklogic/connections")
-@CrossOrigin(origins = "http://localhost:5173", allowedHeaders = "*",
-        methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT,
-                   RequestMethod.DELETE, RequestMethod.OPTIONS})
 @RequiredArgsConstructor
 public class MarkLogicConnectionController {
 

@@ -17,6 +17,8 @@ public class XmlTableMapping {
     String wrapperElementName;
     /** InlineElement only: id of the parent XmlTableMapping this is nested inside. */
     String parentRef;
+    /** When multiple FKs exist between parent and child, specifies the FK column to use for joining. */
+    String joinColumn;
     /** CUSTOM only: JavaScript function body. */
     String customFunction;
     /** CUSTOM only: XSD return type, e.g. "xs:string". */

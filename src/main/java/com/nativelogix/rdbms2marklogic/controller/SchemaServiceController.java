@@ -1,9 +1,9 @@
 package com.nativelogix.rdbms2marklogic.controller;
 
-import com.nativelogix.rdbms2marklogic.model.relational.DbDatabase;
 import com.nativelogix.rdbms2marklogic.model.requests.SchemaAnalysisRequest;
 import com.nativelogix.rdbms2marklogic.service.PasswordEncryptionService;
 import com.nativelogix.rdbms2marklogic.service.SchemaService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -11,8 +11,8 @@ import org.springframework.web.bind.annotation.*;
 import java.util.HashMap;
 import java.util.Map;
 
+@Slf4j
 @RestController
-@CrossOrigin(origins = "http://localhost:5173", allowedHeaders = "*", methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.DELETE, RequestMethod.OPTIONS})
 public class SchemaServiceController {
 
     private final SchemaService schemaService;
@@ -44,11 +44,12 @@ public class SchemaServiceController {
     }
 
     @PostMapping("/v1/schemas")
-    public ResponseEntity<DbDatabase> post(@RequestBody SchemaAnalysisRequest request) {
+    public ResponseEntity<?> post(@RequestBody SchemaAnalysisRequest request) {
         try {
             return ResponseEntity.ok(schemaService.analyzeSchema(request));
         } catch (Exception ex) {
-            return ResponseEntity.internalServerError().build();
+            log.error("Schema analysis failed", ex);
+            return ResponseEntity.internalServerError().body(Map.of("error", ex.getMessage() != null ? ex.getMessage() : ex.getClass().getSimpleName()));
         }
     }
 }
