@@ -21,3 +21,5 @@ Thumbs.db
 # Environment / secrets
 *.properties.local
 application-local.yml
+
+**/static/*

@@ -24,7 +24,7 @@ public class SchemaServiceController {
         this.encryptionService = encryptionService;
     }
 
-    @GetMapping
+    @GetMapping("/api-status")
     public ResponseEntity<String> hello() {
         return ResponseEntity.ok("API is running");
     }

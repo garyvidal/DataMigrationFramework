@@ -13,7 +13,17 @@ import org.springframework.web.bind.annotation.RequestMapping;
 @Controller
 public class SpaController {
 
-    @RequestMapping(value = {"/{path:[^\\.]*}", "/{path:[^\\.]*}/**"})
+    /**
+     * Matches routes for React Router client-side navigation, but excludes:
+     * - /assets/** (static JS/CSS files)
+     * - /v1/** (API routes)
+     * - Paths with file extensions like .js, .css, .png, etc.
+     */
+    @RequestMapping(value = {
+        "/",
+        "/{path:(?!assets|v1|public|static)[^.]*}",
+        "/{path:(?!assets|v1|public|static)[^.]*}/**"
+    })
     public String forward() {
         return "forward:/index.html";
     }
