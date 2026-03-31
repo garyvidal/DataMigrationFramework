@@ -5,8 +5,8 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.nativelogix.rdbms2marklogic</groupId>
-    <artifactId>RdbmsToMarkLogic</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <artifactId>DataMigrationFramework</artifactId>
+    <version>1.0.0</version>
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
@@ -17,6 +17,8 @@
         <maven.compiler.source>23</maven.compiler.source>
         <maven.compiler.target>23</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <!-- Override with -Dfrontend.workingDirectory=frontend/app in CI -->
+        <frontend.workingDirectory>../../Workspace/rdbms2marklogic_web/app</frontend.workingDirectory>
     </properties>
     <dependencies>
         <dependency>
@@ -144,7 +146,7 @@
                 <version>1.15.1</version>
                 <configuration>
                     <!-- Path to the Vite project relative to this pom.xml -->
-                    <workingDirectory>../../Workspace/rdbms2marklogic_web/app</workingDirectory>
+                    <workingDirectory>${frontend.workingDirectory}</workingDirectory>
                     <!-- Install node/npm inside target/ so the working tree stays clean -->
                     <installDirectory>${project.build.directory}/frontend-tools</installDirectory>
                     <nodeVersion>v22.14.0</nodeVersion>
