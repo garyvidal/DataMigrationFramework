@@ -25,12 +25,8 @@ public class SchemaService {
     private final PasswordEncryptionService encryptionService;
 
     public DbDatabase analyzeSchema(SchemaAnalysisRequest request) {
-        final LimitOptions limitOptions = LimitOptionsBuilder.builder()
-                .tableTypes("TABLE,VIEW")
-                .includeSchemas(new RegularExpressionInclusionRule(
-                        "^(?i)(?!master$|tempdb$|model$|msdb$|dbo$).*"
-                ))
-                .build();
+        final Connection connection = resolveConnection(request);
+        final LimitOptions limitOptions = buildLimitOptions(connection);
 
         final LoadOptions loadOptions = LoadOptionsBuilder
                 .builder()
@@ -41,7 +37,7 @@ public class SchemaService {
                 .withLimitOptions(limitOptions)
                 .withLoadOptions(loadOptions);
 
-        final DatabaseConnectionSource dataSource = getDataSource(resolveConnection(request));
+        final DatabaseConnectionSource dataSource = getDataSource(connection);
         final Catalog catalog = SchemaCrawlerUtility.getCatalog(dataSource, options);
 
         DbDatabase database = new DbDatabase();
@@ -77,6 +73,30 @@ public class SchemaService {
 
         database.setSchemas(schemas);
         return database;
+    }
+
+    private LimitOptions buildLimitOptions(Connection connection) {
+        RegularExpressionInclusionRule schemaRule;
+        if (connection.getType() == Connection.ConnectionType.Oracle) {
+            // Exclude Oracle built-in and system schemas
+            schemaRule = new RegularExpressionInclusionRule(
+                    "^(?!SYS$|SYSTEM$|SYSMAN$|SYSBACKUP$|SYSDG$|SYSKM$|SYSRAC$" +
+                    "|DBSNMP$|OUTLN$|XDB$|ANONYMOUS$|MDSYS$|CTXSYS$|ORDSYS$" +
+                    "|EXFSYS$|WMSYS$|LBACSYS$|OLAPSYS$|ORDPLUGINS$|DMSYS$" +
+                    "|ORACLE_OCM$|MDDATA$|AUDSYS$|DBSFWUSER$|DVF$|DVSYS$" +
+                    "|GGSYS$|GSMADMIN_INTERNAL$|GSMCATUSER$|GSMUSER$|OJVMSYS$" +
+                    "|REMOTE_SCHEDULER_AGENT$|APEX_.*|FLOWS_.*).*"
+            );
+        } else {
+            // Exclude SQL Server, PostgreSQL, and MySQL system schemas
+            schemaRule = new RegularExpressionInclusionRule(
+                    "^(?i)(?!master$|tempdb$|model$|msdb$|dbo$|sys$|pg_catalog$|information_schema$).*"
+            );
+        }
+        return LimitOptionsBuilder.builder()
+                .tableTypes("TABLE,VIEW")
+                .includeSchemas(schemaRule)
+                .build();
     }
 
     /**
@@ -135,7 +155,16 @@ public class SchemaService {
                 url.append(";encrypt=true;trustServerCertificate=true");
                 yield url.toString();
             }
-            case Oracle -> String.format("jdbc:oracle:thin:@%s:%d:%s", host, port, database);
+            case Oracle -> {
+                // ServiceName uses thin:@//host:port/serviceName; SID uses thin:@host:port:sid
+                String pdb = connection.getPdbName();
+                String dbName = (pdb != null && !pdb.isBlank()) ? pdb : database;
+                if ("SID".equalsIgnoreCase(connection.getIdentifier())) {
+                    yield String.format("jdbc:oracle:thin:@%s:%d:%s", host, port, dbName);
+                } else {
+                    yield String.format("jdbc:oracle:thin:@//%s:%d/%s", host, port, dbName);
+                }
+            }
             default -> String.format("jdbc:postgresql://%s:%d/%s", host, port, database);
         };
     }
