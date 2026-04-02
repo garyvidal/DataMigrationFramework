@@ -1,9 +1,9 @@
-package com.nativelogix.rdbms2marklogic.service.migration;
+package com.nativelogix.data.migration.framework.service.migration;
 
-import com.nativelogix.rdbms2marklogic.model.migration.DeploymentJob;
-import com.nativelogix.rdbms2marklogic.model.project.Project;
-import com.nativelogix.rdbms2marklogic.model.SavedConnection;
-import com.nativelogix.rdbms2marklogic.model.SavedMarkLogicConnection;
+import com.nativelogix.data.migration.framework.model.migration.DeploymentJob;
+import com.nativelogix.data.migration.framework.model.project.Project;
+import com.nativelogix.data.migration.framework.model.SavedConnection;
+import com.nativelogix.data.migration.framework.model.SavedMarkLogicConnection;
 
 import java.util.List;
 

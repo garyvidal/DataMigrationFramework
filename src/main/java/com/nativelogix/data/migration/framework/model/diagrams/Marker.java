@@ -1,4 +1,4 @@
-package com.nativelogix.rdbms2marklogic.model.diagrams;
+package com.nativelogix.data.migration.framework.model.diagrams;
 
 public enum Marker {
     ONE,

@@ -1,6 +1,6 @@
-package com.nativelogix.rdbms2marklogic.model.requests;
+package com.nativelogix.data.migration.framework.model.requests;
 
-import com.nativelogix.rdbms2marklogic.model.MarkLogicConnection;
+import com.nativelogix.data.migration.framework.model.MarkLogicConnection;
 import lombok.Data;
 
 @Data

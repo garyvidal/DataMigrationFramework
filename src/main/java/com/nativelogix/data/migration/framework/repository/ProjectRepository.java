@@ -1,6 +1,6 @@
-package com.nativelogix.rdbms2marklogic.repository;
+package com.nativelogix.data.migration.framework.repository;
 
-import com.nativelogix.rdbms2marklogic.model.project.Project;
+import com.nativelogix.data.migration.framework.model.project.Project;
 
 import java.util.List;
 import java.util.Optional;

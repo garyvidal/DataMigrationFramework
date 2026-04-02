@@ -1,11 +1,11 @@
-package com.nativelogix.rdbms2marklogic.repository;
+package com.nativelogix.data.migration.framework.repository;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import com.nativelogix.rdbms2marklogic.model.project.Project;
+import com.nativelogix.data.migration.framework.model.project.Project;
 import org.springframework.stereotype.Repository;
 
 import java.io.IOException;
@@ -30,7 +30,7 @@ public class FileSystemProjectRepository implements ProjectRepository {
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
                 .setSerializationInclusion(JsonInclude.Include.NON_NULL);
         String userHome = System.getProperty("user.home");
-        this.projectsDir = Paths.get(userHome, ".rdbms2marklogic", "projects");
+        this.projectsDir = Paths.get(userHome, ".datamigrationframework", "projects");
 
         try {
             Files.createDirectories(projectsDir);

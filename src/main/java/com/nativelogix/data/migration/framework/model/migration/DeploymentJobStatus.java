@@ -1,4 +1,4 @@
-package com.nativelogix.rdbms2marklogic.model.migration;
+package com.nativelogix.data.migration.framework.model.migration;
 
 public enum DeploymentJobStatus {
     PENDING,

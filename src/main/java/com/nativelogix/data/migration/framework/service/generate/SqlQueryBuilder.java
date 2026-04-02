@@ -1,10 +1,10 @@
-package com.nativelogix.rdbms2marklogic.service.generate;
+package com.nativelogix.data.migration.framework.service.generate;
 
-import com.nativelogix.rdbms2marklogic.model.Connection.ConnectionType;
-import com.nativelogix.rdbms2marklogic.model.project.JsonColumnMapping;
-import com.nativelogix.rdbms2marklogic.model.project.JsonTableMapping;
-import com.nativelogix.rdbms2marklogic.model.project.XmlColumnMapping;
-import com.nativelogix.rdbms2marklogic.model.project.XmlTableMapping;
+import com.nativelogix.data.migration.framework.model.Connection.ConnectionType;
+import com.nativelogix.data.migration.framework.model.project.JsonColumnMapping;
+import com.nativelogix.data.migration.framework.model.project.JsonTableMapping;
+import com.nativelogix.data.migration.framework.model.project.XmlColumnMapping;
+import com.nativelogix.data.migration.framework.model.project.XmlTableMapping;
 import org.springframework.stereotype.Component;
 
 import java.util.List;

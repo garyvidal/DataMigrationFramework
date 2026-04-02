@@ -1,11 +1,11 @@
-package com.nativelogix.rdbms2marklogic.repository;
+package com.nativelogix.data.migration.framework.repository;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import com.nativelogix.rdbms2marklogic.model.migration.DeploymentJob;
+import com.nativelogix.data.migration.framework.model.migration.DeploymentJob;
 import org.springframework.stereotype.Repository;
 
 import java.io.IOException;
@@ -30,7 +30,7 @@ public class FileSystemDeploymentJobRepository implements DeploymentJobRepositor
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
                 .setSerializationInclusion(JsonInclude.Include.NON_NULL);
         String userHome = System.getProperty("user.home");
-        this.jobsDir = Paths.get(userHome, ".rdbms2marklogic", "migration-jobs");
+        this.jobsDir = Paths.get(userHome, ".datamigrationframework", "migration-jobs");
         try {
             Files.createDirectories(jobsDir);
         } catch (IOException e) {

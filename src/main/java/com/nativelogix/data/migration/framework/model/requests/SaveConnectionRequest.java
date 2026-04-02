@@ -1,7 +1,7 @@
-package com.nativelogix.rdbms2marklogic.model.requests;
+package com.nativelogix.data.migration.framework.model.requests;
 
-import com.nativelogix.rdbms2marklogic.model.Connection;
-import com.nativelogix.rdbms2marklogic.model.ConnectionEnvironment;
+import com.nativelogix.data.migration.framework.model.Connection;
+import com.nativelogix.data.migration.framework.model.ConnectionEnvironment;
 import lombok.Data;
 
 @Data

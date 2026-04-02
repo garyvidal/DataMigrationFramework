@@ -1,4 +1,4 @@
-package com.nativelogix.rdbms2marklogic.util;
+package com.nativelogix.data.migration.framework.util;
 
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -6,7 +6,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.stream.Stream;
 
-import static com.nativelogix.rdbms2marklogic.util.CaseConverter.Case.*;
+import static com.nativelogix.data.migration.framework.util.CaseConverter.Case.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class CaseConverterTest {

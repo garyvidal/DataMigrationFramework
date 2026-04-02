@@ -1,10 +1,11 @@
-package com.nativelogix.rdbms2marklogic.repository;
+package com.nativelogix.data.migration.framework.repository;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.nativelogix.rdbms2marklogic.model.Connection;
-import com.nativelogix.rdbms2marklogic.model.SavedConnection;
-import com.nativelogix.rdbms2marklogic.service.PasswordEncryptionService;
+import com.nativelogix.data.migration.framework.model.Connection;
+import com.nativelogix.data.migration.framework.model.SavedConnection;
+import com.nativelogix.data.migration.framework.service.PasswordEncryptionService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Repository;
 
 import java.io.File;
@@ -18,6 +19,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Repository
 public class FileSystemConnectionRepository implements ConnectionRepository {
 
@@ -29,7 +31,7 @@ public class FileSystemConnectionRepository implements ConnectionRepository {
         this.encryptionService = encryptionService;
         this.objectMapper = new ObjectMapper();
         String userHome = System.getProperty("user.home");
-        this.connectionsDir = Paths.get(userHome, ".rdbms2marklogic", "connections");
+        this.connectionsDir = Paths.get(userHome, ".datamigrationframework", "connections");
 
         try {
             Files.createDirectories(connectionsDir);
@@ -89,17 +91,17 @@ public class FileSystemConnectionRepository implements ConnectionRepository {
             List<Path> paths = Files.list(connectionsDir)
                     .filter(path -> path.toString().endsWith(".json"))
                     .collect(Collectors.toList());
-            return paths.stream()
-                    .map(path -> {
-                        String filenameStem = path.getFileName().toString();
-                        filenameStem = filenameStem.substring(0, filenameStem.length() - 5);
-                        try {
-                            return readAndMigrate(filenameStem, path.toFile());
-                        } catch (IOException e) {
-                            throw new RuntimeException("Failed to read connection file: " + path, e);
-                        }
-                    })
-                    .collect(Collectors.toList());
+            List<SavedConnection> results = new ArrayList<>();
+            for (Path path : paths) {
+                String filenameStem = path.getFileName().toString();
+                filenameStem = filenameStem.substring(0, filenameStem.length() - 5);
+                try {
+                    results.add(readAndMigrate(filenameStem, path.toFile()));
+                } catch (Exception e) {
+                    log.warn("Skipping unreadable connection file {}: {}", path.getFileName(), e.getMessage());
+                }
+            }
+            return results;
         } catch (IOException e) {
             throw new RuntimeException("Failed to list connections: " + e.getMessage(), e);
         }
@@ -156,7 +158,12 @@ public class FileSystemConnectionRepository implements ConnectionRepository {
                 && !storedPassword.startsWith(PasswordEncryptionService.ENC_PREFIX);
 
         if (sc.getConnection() != null) {
-            sc.getConnection().setPassword(encryptionService.decrypt(storedPassword));
+            try {
+                sc.getConnection().setPassword(encryptionService.decrypt(storedPassword));
+            } catch (Exception e) {
+                log.warn("Could not decrypt password for connection '{}' (key mismatch?). Password cleared — re-enter and save.", sc.getName());
+                sc.getConnection().setPassword(null);
+            }
         }
 
         // Detect legacy name-based filename: stem is the connection name, not its id

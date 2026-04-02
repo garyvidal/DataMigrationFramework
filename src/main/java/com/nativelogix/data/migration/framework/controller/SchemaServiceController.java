@@ -1,8 +1,8 @@
-package com.nativelogix.rdbms2marklogic.controller;
+package com.nativelogix.data.migration.framework.controller;
 
-import com.nativelogix.rdbms2marklogic.model.requests.SchemaAnalysisRequest;
-import com.nativelogix.rdbms2marklogic.service.PasswordEncryptionService;
-import com.nativelogix.rdbms2marklogic.service.SchemaService;
+import com.nativelogix.data.migration.framework.model.requests.SchemaAnalysisRequest;
+import com.nativelogix.data.migration.framework.service.PasswordEncryptionService;
+import com.nativelogix.data.migration.framework.service.SchemaService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;

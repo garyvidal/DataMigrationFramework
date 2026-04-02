@@ -1,7 +1,7 @@
-package com.nativelogix.rdbms2marklogic.controller;
+package com.nativelogix.data.migration.framework.controller;
 
-import com.nativelogix.rdbms2marklogic.model.project.Project;
-import com.nativelogix.rdbms2marklogic.repository.FileSystemProjectRepository;
+import com.nativelogix.data.migration.framework.model.project.Project;
+import com.nativelogix.data.migration.framework.repository.FileSystemProjectRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

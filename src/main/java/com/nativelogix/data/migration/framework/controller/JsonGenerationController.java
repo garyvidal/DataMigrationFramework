@@ -1,8 +1,8 @@
-package com.nativelogix.rdbms2marklogic.controller;
+package com.nativelogix.data.migration.framework.controller;
 
-import com.nativelogix.rdbms2marklogic.model.generate.JsonGenerationRequest;
-import com.nativelogix.rdbms2marklogic.model.generate.JsonPreviewResult;
-import com.nativelogix.rdbms2marklogic.service.generate.JsonGenerationService;
+import com.nativelogix.data.migration.framework.model.generate.JsonGenerationRequest;
+import com.nativelogix.data.migration.framework.model.generate.JsonPreviewResult;
+import com.nativelogix.data.migration.framework.service.generate.JsonGenerationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

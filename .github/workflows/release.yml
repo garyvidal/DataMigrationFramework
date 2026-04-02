@@ -18,7 +18,7 @@ jobs:
       - name: Checkout frontend
         uses: actions/checkout@v4
         with:
-          repository: garyvidal/rdbms2marklogic-web
+          repository: garyvidal/DataMigrationFramework-Web
           path: frontend
 
       - name: Set up Java 23

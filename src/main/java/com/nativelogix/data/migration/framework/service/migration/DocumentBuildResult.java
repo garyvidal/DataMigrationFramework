@@ -1,4 +1,4 @@
-package com.nativelogix.rdbms2marklogic.service.migration;
+package com.nativelogix.data.migration.framework.service.migration;
 
 /**
  * Carries a single generated document string and its target URI for writing to MarkLogic.

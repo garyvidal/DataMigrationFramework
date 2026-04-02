@@ -1,7 +1,7 @@
-package com.nativelogix.rdbms2marklogic.service.generate;
+package com.nativelogix.data.migration.framework.service.generate;
 
-import com.nativelogix.rdbms2marklogic.model.Connection.ConnectionType;
-import com.nativelogix.rdbms2marklogic.model.project.XmlTableMapping;
+import com.nativelogix.data.migration.framework.model.Connection.ConnectionType;
+import com.nativelogix.data.migration.framework.model.project.XmlTableMapping;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;

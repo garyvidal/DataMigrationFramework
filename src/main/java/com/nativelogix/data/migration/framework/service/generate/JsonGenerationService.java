@@ -1,15 +1,15 @@
-package com.nativelogix.rdbms2marklogic.service.generate;
+package com.nativelogix.data.migration.framework.service.generate;
 
-import com.nativelogix.rdbms2marklogic.model.Connection;
-import com.nativelogix.rdbms2marklogic.model.SavedConnection;
-import com.nativelogix.rdbms2marklogic.model.generate.JsonPreviewResult;
-import com.nativelogix.rdbms2marklogic.model.project.JsonDocumentModel;
-import com.nativelogix.rdbms2marklogic.model.project.JsonTableMapping;
-import com.nativelogix.rdbms2marklogic.model.project.NamingCase;
-import com.nativelogix.rdbms2marklogic.model.project.Project;
-import com.nativelogix.rdbms2marklogic.repository.FileSystemProjectRepository;
-import com.nativelogix.rdbms2marklogic.service.JDBCConnectionService;
-import com.nativelogix.rdbms2marklogic.service.generate.JsonDocumentBuilder.MappedRow;
+import com.nativelogix.data.migration.framework.model.Connection;
+import com.nativelogix.data.migration.framework.model.SavedConnection;
+import com.nativelogix.data.migration.framework.model.generate.JsonPreviewResult;
+import com.nativelogix.data.migration.framework.model.project.JsonDocumentModel;
+import com.nativelogix.data.migration.framework.model.project.JsonTableMapping;
+import com.nativelogix.data.migration.framework.model.project.NamingCase;
+import com.nativelogix.data.migration.framework.model.project.Project;
+import com.nativelogix.data.migration.framework.repository.FileSystemProjectRepository;
+import com.nativelogix.data.migration.framework.service.JDBCConnectionService;
+import com.nativelogix.data.migration.framework.service.generate.JsonDocumentBuilder.MappedRow;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

@@ -1,11 +1,11 @@
-package com.nativelogix.rdbms2marklogic.service;
+package com.nativelogix.data.migration.framework.service;
 
 import com.marklogic.client.DatabaseClient;
 import com.marklogic.client.DatabaseClientFactory;
-import com.nativelogix.rdbms2marklogic.model.ConnectionTestResult;
-import com.nativelogix.rdbms2marklogic.model.MarkLogicConnection;
-import com.nativelogix.rdbms2marklogic.model.SavedMarkLogicConnection;
-import com.nativelogix.rdbms2marklogic.repository.MarkLogicConnectionRepository;
+import com.nativelogix.data.migration.framework.model.ConnectionTestResult;
+import com.nativelogix.data.migration.framework.model.MarkLogicConnection;
+import com.nativelogix.data.migration.framework.model.SavedMarkLogicConnection;
+import com.nativelogix.data.migration.framework.repository.MarkLogicConnectionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

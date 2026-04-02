@@ -1,9 +1,9 @@
-package com.nativelogix.rdbms2marklogic.repository;
+package com.nativelogix.data.migration.framework.repository;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.nativelogix.rdbms2marklogic.model.MarkLogicConnection;
-import com.nativelogix.rdbms2marklogic.model.SavedMarkLogicConnection;
-import com.nativelogix.rdbms2marklogic.service.PasswordEncryptionService;
+import com.nativelogix.data.migration.framework.model.MarkLogicConnection;
+import com.nativelogix.data.migration.framework.model.SavedMarkLogicConnection;
+import com.nativelogix.data.migration.framework.service.PasswordEncryptionService;
 import org.springframework.stereotype.Repository;
 
 import java.io.IOException;
@@ -18,7 +18,7 @@ import java.util.stream.Collectors;
 
 /**
  * Persists MarkLogic connections as JSON files under
- * {@code ~/.rdbms2marklogic/marklogic-connections/{id}.json}.
+ * {@code ~/.datamigrationframework/marklogic-connections/{id}.json}.
  * Passwords are encrypted at rest using {@link PasswordEncryptionService}.
  */
 @Repository
@@ -32,7 +32,7 @@ public class FileSystemMarkLogicConnectionRepository implements MarkLogicConnect
         this.encryptionService = encryptionService;
         this.objectMapper = new ObjectMapper();
         this.connectionsDir = Paths.get(
-                System.getProperty("user.home"), ".rdbms2marklogic", "marklogic-connections");
+                System.getProperty("user.home"), ".datamigrationframework", "marklogic-connections");
         try {
             Files.createDirectories(connectionsDir);
         } catch (IOException e) {

@@ -1,4 +1,4 @@
-package com.nativelogix.rdbms2marklogic.model.relational;
+package com.nativelogix.data.migration.framework.model.relational;
 
 import lombok.Data;
 

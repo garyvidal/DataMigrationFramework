@@ -1,4 +1,4 @@
-package com.nativelogix.rdbms2marklogic.service.migration;
+package com.nativelogix.data.migration.framework.service.migration;
 
 import org.springframework.batch.core.launch.JobLauncher;
 import org.springframework.batch.core.launch.support.TaskExecutorJobLauncher;

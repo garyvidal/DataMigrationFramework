@@ -1,10 +1,10 @@
-package com.nativelogix.rdbms2marklogic.controller;
+package com.nativelogix.data.migration.framework.controller;
 
-import com.nativelogix.rdbms2marklogic.model.migration.DeploymentJob;
-import com.nativelogix.rdbms2marklogic.model.migration.MigrationPreviewResult;
-import com.nativelogix.rdbms2marklogic.model.migration.MigrationProgress;
-import com.nativelogix.rdbms2marklogic.model.migration.MigrationRequest;
-import com.nativelogix.rdbms2marklogic.service.migration.MigrationJobService;
+import com.nativelogix.data.migration.framework.model.migration.DeploymentJob;
+import com.nativelogix.data.migration.framework.model.migration.MigrationPreviewResult;
+import com.nativelogix.data.migration.framework.model.migration.MigrationProgress;
+import com.nativelogix.data.migration.framework.model.migration.MigrationRequest;
+import com.nativelogix.data.migration.framework.service.migration.MigrationJobService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;

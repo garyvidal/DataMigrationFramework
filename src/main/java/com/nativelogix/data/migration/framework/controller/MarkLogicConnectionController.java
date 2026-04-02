@@ -1,10 +1,10 @@
-package com.nativelogix.rdbms2marklogic.controller;
+package com.nativelogix.data.migration.framework.controller;
 
-import com.nativelogix.rdbms2marklogic.model.ConnectionTestResult;
-import com.nativelogix.rdbms2marklogic.model.MarkLogicConnection;
-import com.nativelogix.rdbms2marklogic.model.SavedMarkLogicConnection;
-import com.nativelogix.rdbms2marklogic.model.requests.SaveMarkLogicConnectionRequest;
-import com.nativelogix.rdbms2marklogic.service.MarkLogicConnectionService;
+import com.nativelogix.data.migration.framework.model.ConnectionTestResult;
+import com.nativelogix.data.migration.framework.model.MarkLogicConnection;
+import com.nativelogix.data.migration.framework.model.SavedMarkLogicConnection;
+import com.nativelogix.data.migration.framework.model.requests.SaveMarkLogicConnectionRequest;
+import com.nativelogix.data.migration.framework.service.MarkLogicConnectionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

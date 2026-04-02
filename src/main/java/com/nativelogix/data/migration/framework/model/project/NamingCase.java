@@ -1,4 +1,4 @@
-package com.nativelogix.rdbms2marklogic.model.project;
+package com.nativelogix.data.migration.framework.model.project;
 
 /**
  * Naming case conventions for MarkLogic document field names.

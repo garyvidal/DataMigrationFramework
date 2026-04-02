@@ -1,4 +1,4 @@
-package com.nativelogix.rdbms2marklogic;
+package com.nativelogix.data.migration.framework;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;

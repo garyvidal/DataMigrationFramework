@@ -1,6 +1,6 @@
-package com.nativelogix.rdbms2marklogic.model.project;
+package com.nativelogix.data.migration.framework.model.project;
 
-import com.nativelogix.rdbms2marklogic.model.diagrams.ConnectionLineType;
+import com.nativelogix.data.migration.framework.model.diagrams.ConnectionLineType;
 import lombok.Data;
 
 @Data

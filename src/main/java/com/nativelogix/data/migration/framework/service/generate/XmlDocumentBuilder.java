@@ -1,11 +1,10 @@
 
-package com.nativelogix.rdbms2marklogic.service.generate;
+package com.nativelogix.data.migration.framework.service.generate;
 
-import com.nativelogix.rdbms2marklogic.model.project.NamingCase;
-import com.nativelogix.rdbms2marklogic.model.project.XmlColumnMapping;
-import com.nativelogix.rdbms2marklogic.model.project.XmlNamespace;
-import com.nativelogix.rdbms2marklogic.model.project.XmlTableMapping;
-import com.nativelogix.rdbms2marklogic.util.CaseConverter;
+import com.nativelogix.data.migration.framework.model.project.NamingCase;
+import com.nativelogix.data.migration.framework.model.project.XmlColumnMapping;
+import com.nativelogix.data.migration.framework.model.project.XmlNamespace;
+import com.nativelogix.data.migration.framework.model.project.XmlTableMapping;
 import org.springframework.stereotype.Component;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;

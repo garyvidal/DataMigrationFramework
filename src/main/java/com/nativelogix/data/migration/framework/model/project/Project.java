@@ -1,7 +1,7 @@
-package com.nativelogix.rdbms2marklogic.model.project;
+package com.nativelogix.data.migration.framework.model.project;
 
-import com.nativelogix.rdbms2marklogic.model.diagrams.DiagramContainer;
-import com.nativelogix.rdbms2marklogic.model.relational.DbSchema;
+import com.nativelogix.data.migration.framework.model.diagrams.DiagramContainer;
+import com.nativelogix.data.migration.framework.model.relational.DbSchema;
 import lombok.Data;
 
 import java.time.OffsetDateTime;

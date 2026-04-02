@@ -1,4 +1,4 @@
-package com.nativelogix.rdbms2marklogic.util;
+package com.nativelogix.data.migration.framework.util;
 
 import java.util.Arrays;
 import java.util.List;

@@ -1,4 +1,4 @@
-package com.nativelogix.rdbms2marklogic.service;
+package com.nativelogix.data.migration.framework.service;
 
 import org.springframework.stereotype.Service;
 

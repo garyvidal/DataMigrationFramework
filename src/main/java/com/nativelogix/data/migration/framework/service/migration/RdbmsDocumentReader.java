@@ -1,9 +1,14 @@
-package com.nativelogix.rdbms2marklogic.service.migration;
+package com.nativelogix.data.migration.framework.service.migration;
 
-import com.nativelogix.rdbms2marklogic.model.Connection;
-import com.nativelogix.rdbms2marklogic.model.project.*;
-import com.nativelogix.rdbms2marklogic.service.JDBCConnectionService;
-import com.nativelogix.rdbms2marklogic.service.generate.*;
+import com.nativelogix.data.migration.framework.model.Connection;
+import com.nativelogix.data.migration.framework.model.project.*;
+import com.nativelogix.data.migration.framework.service.generate.JoinResolver;
+import com.nativelogix.data.migration.framework.service.generate.JsonDocumentBuilder;
+import com.nativelogix.data.migration.framework.service.generate.SqlQueryBuilder;
+import com.nativelogix.data.migration.framework.service.generate.XmlDocumentBuilder;
+import com.nativelogix.data.migration.framework.model.project.*;
+import com.nativelogix.data.migration.framework.service.JDBCConnectionService;
+import com.nativelogix.data.migration.framework.service.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.batch.item.ExecutionContext;

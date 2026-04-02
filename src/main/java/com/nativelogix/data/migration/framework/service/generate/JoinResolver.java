@@ -1,13 +1,13 @@
-package com.nativelogix.rdbms2marklogic.service.generate;
+package com.nativelogix.data.migration.framework.service.generate;
 
-import com.nativelogix.rdbms2marklogic.model.project.JoinCondition;
-import com.nativelogix.rdbms2marklogic.model.project.JsonTableMapping;
-import com.nativelogix.rdbms2marklogic.model.project.Project;
-import com.nativelogix.rdbms2marklogic.model.project.SyntheticJoin;
-import com.nativelogix.rdbms2marklogic.model.project.XmlTableMapping;
-import com.nativelogix.rdbms2marklogic.model.relational.DbRelationship;
-import com.nativelogix.rdbms2marklogic.model.relational.DbSchema;
-import com.nativelogix.rdbms2marklogic.model.relational.DbTable;
+import com.nativelogix.data.migration.framework.model.project.JoinCondition;
+import com.nativelogix.data.migration.framework.model.project.JsonTableMapping;
+import com.nativelogix.data.migration.framework.model.project.Project;
+import com.nativelogix.data.migration.framework.model.project.SyntheticJoin;
+import com.nativelogix.data.migration.framework.model.project.XmlTableMapping;
+import com.nativelogix.data.migration.framework.model.relational.DbRelationship;
+import com.nativelogix.data.migration.framework.model.relational.DbSchema;
+import com.nativelogix.data.migration.framework.model.relational.DbTable;
 import org.springframework.stereotype.Component;
 
 import java.util.List;

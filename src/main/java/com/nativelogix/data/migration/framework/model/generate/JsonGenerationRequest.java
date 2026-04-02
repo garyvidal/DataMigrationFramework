@@ -1,4 +1,4 @@
-package com.nativelogix.rdbms2marklogic.model.generate;
+package com.nativelogix.data.migration.framework.model.generate;
 
 import lombok.Data;
 

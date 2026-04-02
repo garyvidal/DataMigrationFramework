@@ -1,4 +1,4 @@
-package com.nativelogix.rdbms2marklogic.config;
+package com.nativelogix.data.migration.framework.config;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;

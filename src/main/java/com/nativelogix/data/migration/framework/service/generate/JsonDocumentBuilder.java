@@ -1,12 +1,11 @@
-package com.nativelogix.rdbms2marklogic.service.generate;
+package com.nativelogix.data.migration.framework.service.generate;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.nativelogix.rdbms2marklogic.model.project.JsonColumnMapping;
-import com.nativelogix.rdbms2marklogic.model.project.JsonTableMapping;
-import com.nativelogix.rdbms2marklogic.model.project.NamingCase;
-import com.nativelogix.rdbms2marklogic.util.CaseConverter;
+import com.nativelogix.data.migration.framework.model.project.JsonColumnMapping;
+import com.nativelogix.data.migration.framework.model.project.JsonTableMapping;
+import com.nativelogix.data.migration.framework.model.project.NamingCase;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;

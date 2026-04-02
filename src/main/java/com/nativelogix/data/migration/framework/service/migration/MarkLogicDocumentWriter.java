@@ -1,4 +1,4 @@
-package com.nativelogix.rdbms2marklogic.service.migration;
+package com.nativelogix.data.migration.framework.service.migration;
 
 import com.marklogic.client.DatabaseClient;
 import com.marklogic.client.DatabaseClientFactory;
@@ -7,8 +7,8 @@ import com.marklogic.client.datamovement.WriteBatcher;
 import com.marklogic.client.io.DocumentMetadataHandle;
 import com.marklogic.client.io.Format;
 import com.marklogic.client.io.StringHandle;
-import com.nativelogix.rdbms2marklogic.model.MarkLogicConnection;
-import com.nativelogix.rdbms2marklogic.service.PasswordEncryptionService;
+import com.nativelogix.data.migration.framework.model.MarkLogicConnection;
+import com.nativelogix.data.migration.framework.service.PasswordEncryptionService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.batch.item.Chunk;
