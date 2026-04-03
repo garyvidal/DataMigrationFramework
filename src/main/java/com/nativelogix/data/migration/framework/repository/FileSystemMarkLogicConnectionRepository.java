@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nativelogix.data.migration.framework.model.MarkLogicConnection;
 import com.nativelogix.data.migration.framework.model.SavedMarkLogicConnection;
 import com.nativelogix.data.migration.framework.service.PasswordEncryptionService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Repository;
 
 import java.io.IOException;
@@ -21,6 +22,7 @@ import java.util.stream.Collectors;
  * {@code ~/.datamigrationframework/marklogic-connections/{id}.json}.
  * Passwords are encrypted at rest using {@link PasswordEncryptionService}.
  */
+@Slf4j
 @Repository
 public class FileSystemMarkLogicConnectionRepository implements MarkLogicConnectionRepository {
 
@@ -135,7 +137,13 @@ public class FileSystemMarkLogicConnectionRepository implements MarkLogicConnect
             String storedPassword = sc.getConnection().getPassword();
             boolean isLegacyPlaintext = storedPassword != null && !storedPassword.isEmpty()
                     && !storedPassword.startsWith(PasswordEncryptionService.ENC_PREFIX);
-            sc.getConnection().setPassword(encryptionService.decrypt(storedPassword));
+            try {
+                sc.getConnection().setPassword(encryptionService.decrypt(storedPassword));
+            } catch (Exception e) {
+                log.warn("Could not decrypt password for connection '{}' (key mismatch?). Password cleared — re-enter and save.", sc.getName());
+                sc.getConnection().setPassword(null);
+                return sc;
+            }
             if (isLegacyPlaintext) {
                 save(sc); // re-save with encryption
             }

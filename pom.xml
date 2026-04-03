@@ -4,9 +4,9 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>com.nativelogix.rdbms2marklogic</groupId>
+    <groupId>com.nativelogix.data.migration.framework</groupId>
     <artifactId>DataMigrationFramework</artifactId>
-    <version>1.0.0</version>
+    <version>1.0.1</version>
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
@@ -18,7 +18,7 @@
         <maven.compiler.target>23</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <!-- Override with -Dfrontend.workingDirectory=frontend/app in CI -->
-        <frontend.workingDirectory>../../Workspace/rdbms2marklogic_web/app</frontend.workingDirectory>
+        <frontend.workingDirectory>../DataMigrationFramework-Web/app</frontend.workingDirectory>
     </properties>
     <dependencies>
         <dependency>
@@ -91,6 +91,12 @@
             <artifactId>schemacrawler-sqlserver</artifactId>
             <version>16.25.2</version>
         </dependency>
+        <!-- Picocli - CLI argument parsing with ANSI colour support -->
+        <dependency>
+            <groupId>info.picocli</groupId>
+            <artifactId>picocli</artifactId>
+            <version>4.7.6</version>
+        </dependency>
         <!-- Oracle JDBC driver (available on Maven Central since 19c) -->
         <dependency>
             <groupId>com.oracle.database.jdbc</groupId>
@@ -124,6 +130,19 @@
 
     <build>
         <plugins>
+            <!-- Also wipe generated static assets under src/ on mvn clean -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-clean-plugin</artifactId>
+                <configuration>
+                    <filesets>
+                        <fileset>
+                            <directory>src/main/resources/static</directory>
+                            <includes><include>**/*</include></includes>
+                        </fileset>
+                    </filesets>
+                </configuration>
+            </plugin>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
@@ -199,7 +218,7 @@
                             <outputDirectory>${project.build.outputDirectory}/static</outputDirectory>
                             <resources>
                                 <resource>
-                                    <directory>../../Workspace/rdbms2marklogic_web/app/dist</directory>
+                                    <directory>${frontend.workingDirectory}/dist</directory>
                                     <filtering>false</filtering>
                                 </resource>
                             </resources>

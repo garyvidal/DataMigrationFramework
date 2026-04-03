@@ -96,8 +96,17 @@ public class PasswordEncryptionService {
     // ── Key management ────────────────────────────────────────────────────────
 
     private SecretKey loadOrGenerateKey() throws Exception {
-        Path keyPath = Paths.get(System.getProperty("user.home"), ".rdbms2marklogic", "encryption.key");
+        Path keyPath = Paths.get(System.getProperty("user.home"), ".datamigrationframework", "encryption.key");
         Files.createDirectories(keyPath.getParent());
+
+        // Migrate key from old ~/.rdbms2marklogic location if the new one doesn't exist yet
+        if (!Files.exists(keyPath)) {
+            Path legacyKeyPath = Paths.get(System.getProperty("user.home"), ".rdbms2marklogic", "encryption.key");
+            if (Files.exists(legacyKeyPath)) {
+                Files.copy(legacyKeyPath, keyPath);
+                setOwnerOnlyPermissions(keyPath);
+            }
+        }
 
         if (Files.exists(keyPath)) {
             byte[] keyBytes = Base64.getDecoder().decode(Files.readString(keyPath).trim());

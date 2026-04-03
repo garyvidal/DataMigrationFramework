@@ -91,6 +91,9 @@ public class MigrationJobService {
 
     // ── SSE emitter registry ──────────────────────────────────────────────────
 
+    /** Live processed-record counters for in-flight jobs; removed on job completion. */
+    private final ConcurrentHashMap<String, AtomicLong> liveProcessedCounters = new ConcurrentHashMap<>();
+
     /** Active SSE emitters keyed by jobId; supports multiple subscribers per job. */
     private final ConcurrentHashMap<String, CopyOnWriteArrayList<SseEmitter>> jobEmitters = new ConcurrentHashMap<>();
     /**
@@ -210,7 +213,8 @@ public class MigrationJobService {
             progress.setJobId(job.getId());
             progress.setStatus(job.getStatus());
             progress.setTotalRecords(job.getTotalRecords());
-            progress.setProcessedRecords(job.getProcessedRecords());
+            AtomicLong liveCounter = liveProcessedCounters.get(job.getId());
+            progress.setProcessedRecords(liveCounter != null ? liveCounter.get() : job.getProcessedRecords());
             progress.setErrorMessage(job.getErrorMessage());
             progress.setErrors(job.getErrors());
             if (job.getStartTime() != null) {
@@ -323,8 +327,9 @@ public class MigrationJobService {
         AtomicLong processedCounter = new AtomicLong(0);
         // Populated by beforeJob listener; needed by SSE push to compute elapsed seconds.
         AtomicReference<OffsetDateTime> startTimeRef = new AtomicReference<>();
-        // Initialize SSE push-time tracking for this job.
+        // Initialize SSE push-time tracking and live counter for this job.
         jobLastPushMs.put(jobId, new AtomicLong(0));
+        liveProcessedCounters.put(jobId, processedCounter);
 
         List<Flow> flows = new ArrayList<>(partitionCount);
         if (partitionCount == 1) {
@@ -441,6 +446,7 @@ public class MigrationJobService {
                 });
 
                 // Push final "complete" event and close all emitters for this job
+                liveProcessedCounters.remove(jobId);
                 CopyOnWriteArrayList<SseEmitter> emitters = jobEmitters.remove(jobId);
                 jobLastPushMs.remove(jobId);
                 if (emitters != null && !emitters.isEmpty()) {

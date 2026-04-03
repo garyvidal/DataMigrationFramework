@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /c/Users/garyv/IdeaProjects/DataMigrationFramework-Web/app -type f \\\\\\(-name *.ts -o -name *.tsx -o -name *.js -o -name *.jsx \\\\\\))",
+      "Bash(find c:/Users/garyv/IdeaProjects/DataMigrationFramework -name *.yml -o -name *.yaml -o -name Dockerfile*)",
+      "Bash(find c:/Users/garyv/IdeaProjects/DataMigrationFramework-Web -name *.yml -o -name *.yaml -o -name Dockerfile*)",
+      "Bash(find c:/Users/garyv/IdeaProjects/DataMigrationFramework -name *postgres* -o -name *docker-compose*)",
+      "Bash(netsh interface:*)",
+      "Read(//c/Users/garyv/.rdbms2marklogic/**)",
+      "Bash(javap -cp target/DataMigrationFramework-1.0.0.jar -verbose \"com.nativelogix.data.migration.framework.cli.MigrationCliCommand\")",
+      "Bash(jar tf:*)",
+      "Bash(jar xf:*)",
+      "Bash(javap -verbose \"BOOT-INF/classes/com/nativelogix/data/migration/framework/cli/MigrationCliCommand.class\")"
+    ]
+  }
+}
