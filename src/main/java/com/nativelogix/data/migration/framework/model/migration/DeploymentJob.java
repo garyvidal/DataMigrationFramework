@@ -1,5 +1,7 @@
 package com.nativelogix.data.migration.framework.model.migration;
 
+import com.nativelogix.data.migration.framework.model.marklogic.MarkLogicSecurityConfig;
+
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -14,7 +16,11 @@ public class DeploymentJob {
     private String marklogicConnectionId;
     private String marklogicConnectionName;
     private String directoryPath;
+    /** @deprecated Use {@link #securityConfig} instead. Retained for backwards-compatibility with saved jobs. */
+    @Deprecated
     private List<String> collections = new ArrayList<>();
+    /** Job-level security settings. Overrides project-level settings when set. */
+    private MarkLogicSecurityConfig securityConfig;
     private DeploymentJobStatus status = DeploymentJobStatus.PENDING;
     private long totalRecords;
     private long processedRecords;
@@ -50,8 +56,13 @@ public class DeploymentJob {
     public String getDirectoryPath() { return directoryPath; }
     public void setDirectoryPath(String directoryPath) { this.directoryPath = directoryPath; }
 
+    @SuppressWarnings("DeprecatedIsStillUsed")
     public List<String> getCollections() { return collections; }
+    @SuppressWarnings("DeprecatedIsStillUsed")
     public void setCollections(List<String> collections) { this.collections = collections != null ? collections : new ArrayList<>(); }
+
+    public MarkLogicSecurityConfig getSecurityConfig() { return securityConfig; }
+    public void setSecurityConfig(MarkLogicSecurityConfig securityConfig) { this.securityConfig = securityConfig; }
 
     public DeploymentJobStatus getStatus() { return status; }
     public void setStatus(DeploymentJobStatus status) { this.status = status; }

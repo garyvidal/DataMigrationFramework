@@ -4,10 +4,13 @@ import com.marklogic.client.DatabaseClient;
 import com.marklogic.client.DatabaseClientFactory;
 import com.marklogic.client.datamovement.DataMovementManager;
 import com.marklogic.client.datamovement.WriteBatcher;
+import com.marklogic.client.document.DocumentWriteSet;
+import com.marklogic.client.document.GenericDocumentManager;
 import com.marklogic.client.io.DocumentMetadataHandle;
 import com.marklogic.client.io.Format;
 import com.marklogic.client.io.StringHandle;
 import com.nativelogix.data.migration.framework.model.MarkLogicConnection;
+import com.nativelogix.data.migration.framework.service.MarkLogicSecurityService;
 import com.nativelogix.data.migration.framework.service.PasswordEncryptionService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,6 +46,7 @@ public class MarkLogicDocumentWriter implements ItemWriter<DocumentBuildResult>,
 
     private final MigrationJobContext ctx;
     private final PasswordEncryptionService encryptionService;
+    private final MarkLogicSecurityService securityService;
     /** Documents per HTTP request sent by each WriteBatcher worker thread. */
     private final int batcherBatchSize;
     /** Parallel HTTP writer threads within the WriteBatcher. */
@@ -53,16 +57,29 @@ public class MarkLogicDocumentWriter implements ItemWriter<DocumentBuildResult>,
     private DataMovementManager dmm;
     private WriteBatcher batcher;
 
-    /** Built once in {@link #open} if collections are configured; reused per document. */
+    /**
+     * Fallback document manager used when the DMSDK WriteBatcher cannot be initialised
+     * (e.g. the connected user lacks the {@code rest-reader} role needed by
+     * {@code GET /v1/internal/forestinfo}).  Writes are synchronous and single-threaded
+     * in this mode but functionally correct.
+     */
+    private GenericDocumentManager directDocManager;
+
+    /** True when DMSDK init failed and we fell back to direct DocumentManager writes. */
+    private boolean directWrite = false;
+
+    /** Built once in {@link #open} from securityConfig; reused per document. Null means no metadata (ML defaults apply). */
     private DocumentMetadataHandle metadata;
 
     /** Captures async batcher failures; checked at the start of each {@link #write} call. */
     private volatile Exception writeError;
 
     public MarkLogicDocumentWriter(MigrationJobContext ctx, PasswordEncryptionService encryptionService,
+                                   MarkLogicSecurityService securityService,
                                    int batcherBatchSize, int batcherThreadCount) {
         this.ctx                = ctx;
         this.encryptionService  = encryptionService;
+        this.securityService    = securityService;
         this.batcherBatchSize   = batcherBatchSize;
         this.batcherThreadCount = batcherThreadCount;
     }
@@ -80,29 +97,35 @@ public class MarkLogicDocumentWriter implements ItemWriter<DocumentBuildResult>,
             sharedClient.newDocumentManager().exists("/__rdbms2ml_warmup__");
         } catch (Exception ignored) {}
 
-        // Build the metadata handle once if collections are configured.
-        boolean hasCollections = ctx.getCollections() != null && !ctx.getCollections().isEmpty();
-        if (hasCollections) {
-            metadata = new DocumentMetadataHandle();
-            metadata.getCollections().addAll(ctx.getCollections());
+        // Build the metadata handle once from the effective security config (permissions, collections, quality, metadata).
+        metadata = securityService.buildMetadataHandle(ctx.getSecurityConfig());
+
+        // Attempt DMSDK WriteBatcher setup. If the connected user lacks rest-reader/rest-writer
+        // (needed for GET /v1/internal/forestinfo), fall back to direct DocumentManager writes.
+        try {
+            dmm = sharedClient.newDataMovementManager();
+            batcher = dmm.newWriteBatcher()
+                    .withBatchSize(batcherBatchSize)
+                    .withThreadCount(batcherThreadCount)
+                    .onBatchSuccess(batch ->
+                            log.debug("WriteBatcher wrote batch of {} docs", batch.getItems().length))
+                    .onBatchFailure((batch, throwable) -> {
+                        log.error("WriteBatcher batch failed: {}", throwable.getMessage(), throwable);
+                        writeError = new RuntimeException(
+                                "MarkLogic write failed: " + throwable.getMessage(), throwable);
+                    });
+            dmm.startJob(batcher);
+            log.debug("MarkLogic WriteBatcher opened for {} (batchSize={}, threads={})",
+                    mlConn.getHost(), batcherBatchSize, batcherThreadCount);
+        } catch (Exception e) {
+            log.warn("DMSDK WriteBatcher unavailable ({}); falling back to direct DocumentManager writes. " +
+                     "Grant the connected user rest-reader/rest-writer to enable parallel batching.",
+                     e.getMessage());
+            directWrite = true;
+            directDocManager = sharedClient.newDocumentManager();
+            batcher = null;
+            dmm     = null;
         }
-
-        // Set up DMSDK WriteBatcher for parallel async writes.
-        dmm = sharedClient.newDataMovementManager();
-        batcher = dmm.newWriteBatcher()
-                .withBatchSize(batcherBatchSize)
-                .withThreadCount(batcherThreadCount)
-                .onBatchSuccess(batch ->
-                        log.debug("WriteBatcher wrote batch of {} docs", batch.getItems().length))
-                .onBatchFailure((batch, throwable) -> {
-                    log.error("WriteBatcher batch failed: {}", throwable.getMessage(), throwable);
-                    writeError = new RuntimeException(
-                            "MarkLogic write failed: " + throwable.getMessage(), throwable);
-                });
-        dmm.startJob(batcher);
-
-        log.debug("MarkLogic WriteBatcher opened for {} (batchSize={}, threads={})",
-                mlConn.getHost(), batcherBatchSize, batcherThreadCount);
     }
 
     @Override
@@ -143,18 +166,35 @@ public class MarkLogicDocumentWriter implements ItemWriter<DocumentBuildResult>,
 
         Format format = "JSON".equalsIgnoreCase(items.get(0).getFormat()) ? Format.JSON : Format.XML;
 
-        for (DocumentBuildResult doc : items) {
-            StringHandle content = new StringHandle(doc.getContent()).withFormat(format);
-            if (metadata != null) {
-                batcher.add(doc.getUri(), metadata, content);
-            } else {
-                batcher.add(doc.getUri(), content);
+        if (directWrite) {
+            // Fallback path: synchronous writes via DocumentWriteSet.
+            // DocumentMetadataHandle implements GenericWriteHandle so write(uri, metadata, content)
+            // resolves to the wrong overload — DocumentWriteSet.add() is correctly typed.
+            DocumentWriteSet writeSet = directDocManager.newWriteSet();
+            for (DocumentBuildResult doc : items) {
+                StringHandle content = new StringHandle(doc.getContent()).withFormat(format);
+                if (metadata != null) {
+                    writeSet.add(doc.getUri(), metadata, content);
+                } else {
+                    writeSet.add(doc.getUri(), content);
+                }
             }
+            directDocManager.write(writeSet);
+            log.debug("Direct-wrote {} documents to MarkLogic", items.size());
+        } else {
+            // Normal path: queue into DMSDK WriteBatcher for parallel async writes.
+            for (DocumentBuildResult doc : items) {
+                StringHandle content = new StringHandle(doc.getContent()).withFormat(format);
+                if (metadata != null) {
+                    batcher.add(doc.getUri(), metadata, content);
+                } else {
+                    batcher.add(doc.getUri(), content);
+                }
+            }
+            // The batcher auto-flushes when BATCHER_BATCH_SIZE is reached on its worker threads.
+            // Remaining buffered docs are flushed in close() via flushAndWait().
+            log.debug("Queued {} documents to WriteBatcher", items.size());
         }
-        // The batcher auto-flushes when BATCHER_BATCH_SIZE is reached on its worker threads.
-        // Remaining buffered docs are flushed in close() via flushAndWait().
-
-        log.debug("Queued {} documents to WriteBatcher", items.size());
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────

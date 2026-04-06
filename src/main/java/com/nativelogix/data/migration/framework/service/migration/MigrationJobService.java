@@ -1,5 +1,6 @@
 package com.nativelogix.data.migration.framework.service.migration;
 
+import com.nativelogix.data.migration.framework.model.marklogic.MarkLogicSecurityConfig;
 import com.nativelogix.data.migration.framework.model.migration.DeploymentJob;
 import com.nativelogix.data.migration.framework.model.migration.DeploymentJobStatus;
 import com.nativelogix.data.migration.framework.model.migration.MigrationPreviewResult;
@@ -13,6 +14,7 @@ import com.nativelogix.data.migration.framework.repository.FileSystemDeploymentJ
 import com.nativelogix.data.migration.framework.repository.FileSystemProjectRepository;
 import com.nativelogix.data.migration.framework.service.JDBCConnectionService;
 import com.nativelogix.data.migration.framework.service.MarkLogicConnectionService;
+import com.nativelogix.data.migration.framework.service.MarkLogicSecurityService;
 import com.nativelogix.data.migration.framework.service.PasswordEncryptionService;
 import com.nativelogix.data.migration.framework.service.generate.JoinResolver;
 import com.nativelogix.data.migration.framework.service.generate.JsonDocumentBuilder;
@@ -73,6 +75,7 @@ public class MigrationJobService {
     private final XmlDocumentBuilder xmlDocumentBuilder;
     private final JsonDocumentBuilder jsonDocumentBuilder;
     private final PasswordEncryptionService passwordEncryptionService;
+    private final MarkLogicSecurityService markLogicSecurityService;
     private final JobRepository batchJobRepository;
     private final PlatformTransactionManager transactionManager;
 
@@ -192,14 +195,17 @@ public class MigrationJobService {
         job.setMarklogicConnectionId(mlConn.getId());
         job.setMarklogicConnectionName(mlConn.getName());
         job.setDirectoryPath(request.getDirectoryPath());
-        job.setCollections(request.getCollections() != null ? request.getCollections() : List.of());
+        // Merge project-level and job-level security configs (job overrides project).
+        MarkLogicSecurityConfig effectiveSecurity = markLogicSecurityService.mergeConfigs(
+                project.getSecurityConfig(), request.getSecurityConfig());
+        job.setSecurityConfig(effectiveSecurity);
         job.setStatus(DeploymentJobStatus.PENDING);
         job.setTotalRecords(totalRecords);
         job.setCreated(OffsetDateTime.now());
         jobRepository.save(job);
 
         MigrationJobContext ctx = new MigrationJobContext(job, project, sourceConn, mlConn,
-                request.getDirectoryPath(), job.getCollections());
+                request.getDirectoryPath(), effectiveSecurity);
         launchBatchJob(job.getId(), ctx, totalRecords);
 
         return job;
@@ -225,8 +231,20 @@ public class MigrationJobService {
         });
     }
 
-    public List<DeploymentJob> getAllJobs() { return jobRepository.findAll(); }
-    public void deleteJob(String jobId)     { jobRepository.delete(jobId); }
+    public List<DeploymentJob> getAllJobs()              { return jobRepository.findAll(); }
+    public Optional<DeploymentJob> getJob(String jobId) { return jobRepository.findById(jobId); }
+    public void deleteJob(String jobId)                  { jobRepository.delete(jobId); }
+
+    public Optional<MarkLogicSecurityConfig> getJobSecurity(String jobId) {
+        return jobRepository.findById(jobId).map(DeploymentJob::getSecurityConfig);
+    }
+
+    public Optional<DeploymentJob> updateJobSecurity(String jobId, MarkLogicSecurityConfig securityConfig) {
+        return jobRepository.findById(jobId).map(job -> {
+            job.setSecurityConfig(securityConfig);
+            return jobRepository.save(job);
+        });
+    }
 
     // ── Migration preview ─────────────────────────────────────────────────────
 
@@ -391,7 +409,7 @@ public class MigrationJobService {
                 xmlDocumentBuilder, jsonDocumentBuilder);
 
         MarkLogicDocumentWriter writer = new MarkLogicDocumentWriter(ctx, passwordEncryptionService,
-                batcherBatchSize, batcherThreadCount);
+                markLogicSecurityService, batcherBatchSize, batcherThreadCount);
 
         Step step = new StepBuilder("migrationStep-" + jobId + "-" + index, batchJobRepository)
                 .<DocumentBuildResult, DocumentBuildResult>chunk(CHUNK_SIZE, transactionManager)

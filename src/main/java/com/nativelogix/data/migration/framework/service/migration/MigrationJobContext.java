@@ -1,11 +1,10 @@
 package com.nativelogix.data.migration.framework.service.migration;
 
 import com.nativelogix.data.migration.framework.model.migration.DeploymentJob;
+import com.nativelogix.data.migration.framework.model.marklogic.MarkLogicSecurityConfig;
 import com.nativelogix.data.migration.framework.model.project.Project;
 import com.nativelogix.data.migration.framework.model.SavedConnection;
 import com.nativelogix.data.migration.framework.model.SavedMarkLogicConnection;
-
-import java.util.List;
 
 /**
  * Immutable context passed through a Spring Batch job execution as a job parameter.
@@ -18,20 +17,21 @@ public class MigrationJobContext {
     private final SavedConnection sourceConnection;
     private final SavedMarkLogicConnection marklogicConnection;
     private final String directoryPath;
-    private final List<String> collections;
+    /** Effective security config after merging project + job overrides. May be null (MarkLogic defaults apply). */
+    private final MarkLogicSecurityConfig securityConfig;
 
     public MigrationJobContext(DeploymentJob job,
                                 Project project,
                                 SavedConnection sourceConnection,
                                 SavedMarkLogicConnection marklogicConnection,
                                 String directoryPath,
-                                List<String> collections) {
-        this.job = job;
-        this.project = project;
-        this.sourceConnection = sourceConnection;
+                                MarkLogicSecurityConfig securityConfig) {
+        this.job                = job;
+        this.project            = project;
+        this.sourceConnection   = sourceConnection;
         this.marklogicConnection = marklogicConnection;
-        this.directoryPath = directoryPath;
-        this.collections = collections;
+        this.directoryPath      = directoryPath;
+        this.securityConfig     = securityConfig;
     }
 
     public DeploymentJob getJob() { return job; }
@@ -39,5 +39,5 @@ public class MigrationJobContext {
     public SavedConnection getSourceConnection() { return sourceConnection; }
     public SavedMarkLogicConnection getMarklogicConnection() { return marklogicConnection; }
     public String getDirectoryPath() { return directoryPath; }
-    public List<String> getCollections() { return collections; }
+    public MarkLogicSecurityConfig getSecurityConfig() { return securityConfig; }
 }

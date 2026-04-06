@@ -1,5 +1,6 @@
 package com.nativelogix.data.migration.framework.controller;
 
+import com.nativelogix.data.migration.framework.model.marklogic.MarkLogicSecurityConfig;
 import com.nativelogix.data.migration.framework.model.project.Project;
 import com.nativelogix.data.migration.framework.repository.FileSystemProjectRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -52,5 +53,24 @@ public class ProjectController {
         }
         projectRepository.delete(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/v1/projects/{id}/security")
+    public ResponseEntity<MarkLogicSecurityConfig> getProjectSecurity(@PathVariable String id) {
+        return projectRepository.findById(id)
+                .map(p -> ResponseEntity.ok(p.getSecurityConfig()))
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @PutMapping("/v1/projects/{id}/security")
+    public ResponseEntity<MarkLogicSecurityConfig> updateProjectSecurity(
+            @PathVariable String id,
+            @RequestBody MarkLogicSecurityConfig securityConfig) {
+        return projectRepository.findById(id).map(project -> {
+            project.setSecurityConfig(securityConfig);
+            project.setModified(OffsetDateTime.now());
+            projectRepository.save(id, project);
+            return ResponseEntity.ok(securityConfig);
+        }).orElseGet(() -> ResponseEntity.notFound().build());
     }
 }

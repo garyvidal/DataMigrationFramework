@@ -1,6 +1,7 @@
 package com.nativelogix.data.migration.framework.model.project;
 
 import com.nativelogix.data.migration.framework.model.diagrams.DiagramContainer;
+import com.nativelogix.data.migration.framework.model.marklogic.MarkLogicSecurityConfig;
 import com.nativelogix.data.migration.framework.model.relational.DbSchema;
 import lombok.Data;
 
@@ -21,4 +22,6 @@ public class Project {
     List<DiagramContainer> diagrams;
     ProjectSettings settings;
     List<SyntheticJoin> syntheticJoins;
+    /** Optional project-level MarkLogic document security applied to all migrations unless overridden at job level. */
+    MarkLogicSecurityConfig securityConfig;
 }

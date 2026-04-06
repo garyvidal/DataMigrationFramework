@@ -1,5 +1,6 @@
 package com.nativelogix.data.migration.framework.controller;
 
+import com.nativelogix.data.migration.framework.model.marklogic.MarkLogicSecurityConfig;
 import com.nativelogix.data.migration.framework.model.migration.DeploymentJob;
 import com.nativelogix.data.migration.framework.model.migration.MigrationPreviewResult;
 import com.nativelogix.data.migration.framework.model.migration.MigrationProgress;
@@ -68,5 +69,25 @@ public class MigrationController {
     @GetMapping(value = "/v1/migration/jobs/{id}/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamProgress(@PathVariable String id) {
         return migrationJobService.createSseEmitter(id);
+    }
+
+    /** Get the security config for a specific job */
+    @GetMapping("/v1/migration/jobs/{id}/security")
+    public ResponseEntity<MarkLogicSecurityConfig> getJobSecurity(@PathVariable String id) {
+        return migrationJobService.getJobSecurity(id)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> migrationJobService.getJob(id).isPresent()
+                        ? ResponseEntity.ok(null)
+                        : ResponseEntity.notFound().build());
+    }
+
+    /** Update the security config for a specific job */
+    @PutMapping("/v1/migration/jobs/{id}/security")
+    public ResponseEntity<MarkLogicSecurityConfig> updateJobSecurity(
+            @PathVariable String id,
+            @RequestBody MarkLogicSecurityConfig securityConfig) {
+        return migrationJobService.updateJobSecurity(id, securityConfig)
+                .map(job -> ResponseEntity.ok(job.getSecurityConfig()))
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 }
