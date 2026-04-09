@@ -194,13 +194,30 @@ public class MigrationJobService {
         MarkLogicSecurityConfig effectiveSecurity = markLogicSecurityService.mergeConfigs(
                 project.getSecurityConfig(), request.getSecurityConfig());
         job.setSecurityConfig(effectiveSecurity);
-        job.setStatus(DeploymentJobStatus.PENDING);
+        job.setDryRun(request.isDryRun());
+        job.setTransformName(request.getTransformName());
+        job.setTransformParams(request.getTransformParams());
         job.setTotalRecords(totalRecords);
         job.setCreated(OffsetDateTime.now());
+
+        if (request.isDryRun()) {
+            // Dry run: persist the job as immediately completed — no documents are written.
+            job.setStatus(DeploymentJobStatus.COMPLETED);
+            job.setProcessedRecords(0);
+            job.setStartTime(OffsetDateTime.now());
+            job.setEndTime(OffsetDateTime.now());
+            jobRepository.save(job);
+            log.info("Dry run job {} completed — {} source records counted, no documents written.",
+                    job.getId(), totalRecords);
+            return job;
+        }
+
+        job.setStatus(DeploymentJobStatus.PENDING);
         jobRepository.save(job);
 
         MigrationJobContext ctx = new MigrationJobContext(job, project, sourceConn, mlConn,
-                request.getDirectoryPath(), effectiveSecurity);
+                request.getDirectoryPath(), effectiveSecurity,
+                request.getTransformName(), request.getTransformParams());
         launchBatchJob(job.getId(), ctx, totalRecords);
 
         return job;

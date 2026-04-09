@@ -3,6 +3,7 @@ package com.nativelogix.data.migration.framework.model.migration;
 import com.nativelogix.data.migration.framework.model.marklogic.MarkLogicSecurityConfig;
 
 import java.util.List;
+import java.util.Map;
 
 public class MigrationRequest {
 
@@ -15,6 +16,12 @@ public class MigrationRequest {
     private List<String> collections;
     /** Job-level security override. Merged on top of the project's securityConfig at job start. */
     private MarkLogicSecurityConfig securityConfig;
+    /** When true, count source records and validate config but do not write any documents to MarkLogic. */
+    private boolean dryRun = false;
+    /** Name of a server-side MarkLogic REST transform to apply on ingest (optional). */
+    private String transformName;
+    /** Named parameters passed to the transform (optional). */
+    private Map<String, String> transformParams;
 
     public MigrationRequest() {}
 
@@ -37,4 +44,13 @@ public class MigrationRequest {
 
     public MarkLogicSecurityConfig getSecurityConfig() { return securityConfig; }
     public void setSecurityConfig(MarkLogicSecurityConfig securityConfig) { this.securityConfig = securityConfig; }
+
+    public boolean isDryRun() { return dryRun; }
+    public void setDryRun(boolean dryRun) { this.dryRun = dryRun; }
+
+    public String getTransformName() { return transformName; }
+    public void setTransformName(String transformName) { this.transformName = transformName; }
+
+    public Map<String, String> getTransformParams() { return transformParams; }
+    public void setTransformParams(Map<String, String> transformParams) { this.transformParams = transformParams; }
 }

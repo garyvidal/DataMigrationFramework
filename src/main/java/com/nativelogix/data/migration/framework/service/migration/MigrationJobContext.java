@@ -6,6 +6,8 @@ import com.nativelogix.data.migration.framework.model.project.Project;
 import com.nativelogix.data.migration.framework.model.SavedConnection;
 import com.nativelogix.data.migration.framework.model.SavedMarkLogicConnection;
 
+import java.util.Map;
+
 /**
  * Immutable context passed through a Spring Batch job execution as a job parameter.
  * Holds everything the reader/processor/writer need without re-fetching.
@@ -19,19 +21,27 @@ public class MigrationJobContext {
     private final String directoryPath;
     /** Effective security config after merging project + job overrides. May be null (MarkLogic defaults apply). */
     private final MarkLogicSecurityConfig securityConfig;
+    /** Optional server-side REST transform name to apply on ingest. Null means no transform. */
+    private final String transformName;
+    /** Optional named parameters for the transform. */
+    private final Map<String, String> transformParams;
 
     public MigrationJobContext(DeploymentJob job,
                                 Project project,
                                 SavedConnection sourceConnection,
                                 SavedMarkLogicConnection marklogicConnection,
                                 String directoryPath,
-                                MarkLogicSecurityConfig securityConfig) {
+                                MarkLogicSecurityConfig securityConfig,
+                                String transformName,
+                                Map<String, String> transformParams) {
         this.job                = job;
         this.project            = project;
         this.sourceConnection   = sourceConnection;
         this.marklogicConnection = marklogicConnection;
         this.directoryPath      = directoryPath;
         this.securityConfig     = securityConfig;
+        this.transformName      = transformName;
+        this.transformParams    = transformParams;
     }
 
     public DeploymentJob getJob() { return job; }
@@ -40,4 +50,6 @@ public class MigrationJobContext {
     public SavedMarkLogicConnection getMarklogicConnection() { return marklogicConnection; }
     public String getDirectoryPath() { return directoryPath; }
     public MarkLogicSecurityConfig getSecurityConfig() { return securityConfig; }
+    public String getTransformName() { return transformName; }
+    public Map<String, String> getTransformParams() { return transformParams; }
 }

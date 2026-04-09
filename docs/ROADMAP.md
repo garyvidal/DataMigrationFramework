@@ -5,17 +5,16 @@
 Based on the project’s current backend and frontend scope, here are strong roadmap candidates:
 
 ### 1. Core migration capability improvements
-- MarkLogic document security support
+- ~~MarkLogic document security support~~
   - document permissions, collections, quality, metadata
   - job-level overrides and project inheritance
-- JSON mapping expansion
+- ~~JSON mapping expansion~~
   - richer `JsonTableMapping` / `JsonColumnMapping`
   - nested objects, arrays, inline objects, custom transform functions
-- XML/JSON generation preview enhancements
-  - live sample row preview
+-~~XML/JSON generation preview enhancements~~
+  - ~~live sample row preview~~
   - schema-driven document validation
-  - side-by-side XML/JSON compare mode
-
+ 
 ### 2. Migration execution and automation
 - robust batch job orchestration
   - pause / resume / retry / cancel
@@ -24,12 +23,12 @@ Based on the project’s current backend and frontend scope, here are strong roa
   - cron-style jobs
   - automatic re-run on schema changes
 - migration package improvements
-  - portable import/export with versioning
-  - CLI-driven package execution with overrides
+  - ~~portable import/export with versioning~~
+  - ~~CLI-driven package execution with overrides~~
   - package validation and dry-run mode
 
-### 3. Observability and operations
-- migration dashboard
+### ~~ Observability and operations~~
+- ~~migration dashboard~~
   - progress, throughput, error summaries
   - per-entity and per-step metrics
 - logging and error triage

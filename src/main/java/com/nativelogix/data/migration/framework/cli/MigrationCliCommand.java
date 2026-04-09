@@ -14,15 +14,21 @@ import com.nativelogix.data.migration.framework.model.project.Project;
 import com.nativelogix.data.migration.framework.repository.ConnectionRepository;
 import com.nativelogix.data.migration.framework.repository.MarkLogicConnectionRepository;
 import com.nativelogix.data.migration.framework.repository.ProjectRepository;
+import com.nativelogix.data.migration.framework.model.validation.CheckStatus;
+import com.nativelogix.data.migration.framework.model.validation.ValidationCheck;
+import com.nativelogix.data.migration.framework.model.validation.ValidationReport;
 import com.nativelogix.data.migration.framework.service.PackageService;
 import com.nativelogix.data.migration.framework.service.migration.MigrationJobService;
+import com.nativelogix.data.migration.framework.service.migration.MigrationValidationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import picocli.CommandLine.*;
 
 import java.io.File;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.Callable;
 
@@ -127,9 +133,35 @@ public class MigrationCliCommand implements Callable<Integer> {
     )
     private boolean listMlConnections;
 
+    @Option(
+        names = {"--dry-run"},
+        description = "Count source records and validate config but do not write any documents to MarkLogic."
+    )
+    private boolean dryRun;
+
+    @Option(
+        names = {"--transform"},
+        description = "Name of a server-side MarkLogic REST transform to apply on ingest (optional)."
+    )
+    private String transformName;
+
+    @Option(
+        names = {"--transform-param"},
+        description = "Named parameter for the ingest transform, in key=value form. Repeatable.",
+        split = ","
+    )
+    private List<String> transformParamList;
+
+    @Option(
+        names = {"--validate-only"},
+        description = "Run pre-flight validation checks and print the report. Exit 0 if all checks pass, 1 if any FAIL."
+    )
+    private boolean validateOnly;
+
     // ── Dependencies ──────────────────────────────────────────────────────────
 
     private final MigrationJobService migrationJobService;
+    private final MigrationValidationService migrationValidationService;
     private final ProjectRepository projectRepository;
     private final ConnectionRepository connectionRepository;
     private final MarkLogicConnectionRepository markLogicConnectionRepository;
@@ -155,6 +187,22 @@ public class MigrationCliCommand implements Callable<Integer> {
         // ── Package mode: load project + connections from file ─────────────────
         if (packageFile != null) {
             return runWithPackage();
+        }
+
+        // ── Validate-only mode (normal, non-package) ───────────────────────────
+        if (validateOnly) {
+            if (projectNameOrId == null || projectNameOrId.isBlank()) {
+                print(Ansi.RED + "Missing required option: --project" + Ansi.RESET);
+                return 1;
+            }
+            if (mlConnectionNameOrId == null || mlConnectionNameOrId.isBlank()) {
+                print(Ansi.RED + "Missing required option: --marklogic-connection" + Ansi.RESET);
+                return 1;
+            }
+            Project project = resolveProject(projectNameOrId);
+            String sourceConnectionId = resolveSourceConnectionId(sourceConnectionNameOrId);
+            String mlConnectionId = resolveMlConnectionId(mlConnectionNameOrId);
+            return runValidateOnly(project.getId(), sourceConnectionId, mlConnectionId);
         }
 
         // ── Normal mode: require --project and --marklogic-connection ──────────
@@ -236,6 +284,10 @@ public class MigrationCliCommand implements Callable<Integer> {
             sourceConnectionId = resolveSourceConnectionId(sourceConnectionNameOrId);
         }
 
+        if (validateOnly) {
+            return runValidateOnly(projectId, sourceConnectionId, mlConnectionId);
+        }
+
         return runMigration(projectId, sourceConnectionId, mlConnectionId);
     }
 
@@ -253,6 +305,49 @@ public class MigrationCliCommand implements Callable<Integer> {
         print("");
 
         return runMigration(project.getId(), sourceConnectionId, mlConnectionId);
+    }
+
+    // ── Validate-only execution ───────────────────────────────────────────────
+
+    private int runValidateOnly(String projectId, String sourceConnectionId, String mlConnectionId) {
+        print(Ansi.CYAN + "Running pre-flight validation..." + Ansi.RESET);
+        print("");
+
+        MigrationRequest req = new MigrationRequest();
+        req.setProjectId(projectId);
+        req.setSourceConnectionId(sourceConnectionId);
+        req.setMarklogicConnectionId(mlConnectionId);
+        req.setDirectoryPath(directoryPath);
+
+        ValidationReport report = migrationValidationService.validate(req);
+
+        for (ValidationCheck check : report.getChecks()) {
+            String icon;
+            String color;
+            switch (check.status()) {
+                case PASS -> { icon = "✓"; color = Ansi.GREEN; }
+                case WARN -> { icon = "⚠"; color = Ansi.YELLOW; }
+                default   -> { icon = "✗"; color = Ansi.RED; }
+            }
+            String detail = check.detail() != null ? "  " + check.detail() : "";
+            print(String.format("  %s%s%s  %-35s%s", color, icon, Ansi.RESET, check.label(), detail));
+            if (check.hint() != null && check.status() != CheckStatus.PASS) {
+                print("       " + Ansi.CYAN + "→ " + check.hint() + Ansi.RESET);
+            }
+        }
+
+        print("");
+        if (report.isCanProceed()) {
+            if (report.isHasWarnings()) {
+                print(Ansi.YELLOW + "Validation passed with warnings." + Ansi.RESET);
+            } else {
+                print(Ansi.GREEN + "All checks passed." + Ansi.RESET);
+            }
+            return 0;
+        } else {
+            print(Ansi.RED + "Validation failed — one or more checks did not pass." + Ansi.RESET);
+            return 1;
+        }
     }
 
     // ── Shared migration execution ────────────────────────────────────────────
@@ -273,8 +368,26 @@ public class MigrationCliCommand implements Callable<Integer> {
         req.setMarklogicConnectionId(mlConnectionId);
         req.setDirectoryPath(directoryPath);
         req.setCollections(collections);
+        req.setDryRun(dryRun);
+        if (transformName != null && !transformName.isBlank()) {
+            req.setTransformName(transformName.trim());
+            if (transformParamList != null && !transformParamList.isEmpty()) {
+                Map<String, String> params = new HashMap<>();
+                for (String entry : transformParamList) {
+                    int eq = entry.indexOf('=');
+                    if (eq > 0) {
+                        params.put(entry.substring(0, eq).trim(), entry.substring(eq + 1));
+                    }
+                }
+                req.setTransformParams(params);
+            }
+        }
 
-        print(Ansi.YELLOW + "Starting migration..." + Ansi.RESET);
+        if (dryRun) {
+            print(Ansi.YELLOW + "Starting dry run (no documents will be written)..." + Ansi.RESET);
+        } else {
+            print(Ansi.YELLOW + "Starting migration..." + Ansi.RESET);
+        }
         DeploymentJob job = migrationJobService.startJob(req);
         print(Ansi.YELLOW + "Job ID: " + Ansi.RESET + job.getId());
         print("");
@@ -286,6 +399,12 @@ public class MigrationCliCommand implements Callable<Integer> {
         print(Ansi.CYAN + "Directory:            " + Ansi.RESET + directoryPath);
         if (collections != null && !collections.isEmpty()) {
             print(Ansi.CYAN + "Collections:          " + Ansi.RESET + String.join(", ", collections));
+        }
+        if (transformName != null && !transformName.isBlank()) {
+            print(Ansi.CYAN + "Transform:            " + Ansi.RESET + transformName.trim());
+            if (transformParamList != null && !transformParamList.isEmpty()) {
+                print(Ansi.CYAN + "Transform params:     " + Ansi.RESET + String.join(", ", transformParamList));
+            }
         }
     }
 
@@ -332,8 +451,13 @@ public class MigrationCliCommand implements Callable<Integer> {
 
             if (status == DeploymentJobStatus.COMPLETED) {
                 clearLine();
-                print(Ansi.GREEN + "✓ Migration completed successfully!" + Ansi.RESET);
-                print(String.format("  %s documents written in %s", processed, formatElapsed(elapsed)));
+                if (dryRun) {
+                    print(Ansi.GREEN + "✓ Dry run completed." + Ansi.RESET);
+                    print(String.format("  %s documents would be written (no writes performed)", total > 0 ? total : processed));
+                } else {
+                    print(Ansi.GREEN + "✓ Migration completed successfully!" + Ansi.RESET);
+                    print(String.format("  %s documents written in %s", processed, formatElapsed(elapsed)));
+                }
                 return 0;
             }
 

@@ -5,7 +5,9 @@ import com.nativelogix.data.migration.framework.model.migration.DeploymentJob;
 import com.nativelogix.data.migration.framework.model.migration.MigrationPreviewResult;
 import com.nativelogix.data.migration.framework.model.migration.MigrationProgress;
 import com.nativelogix.data.migration.framework.model.migration.MigrationRequest;
+import com.nativelogix.data.migration.framework.model.validation.ValidationReport;
 import com.nativelogix.data.migration.framework.service.migration.MigrationJobService;
+import com.nativelogix.data.migration.framework.service.migration.MigrationValidationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -19,6 +21,19 @@ import java.util.List;
 public class MigrationController {
 
     private final MigrationJobService migrationJobService;
+    private final MigrationValidationService migrationValidationService;
+
+    /** Run pre-flight validation checks without starting a job */
+    @PostMapping("/v1/migration/validate")
+    public ResponseEntity<ValidationReport> validate(@RequestBody MigrationRequest request) {
+        if (request.getProjectId() == null || request.getProjectId().isBlank()) {
+            return ResponseEntity.badRequest().build();
+        }
+        if (request.getMarklogicConnectionId() == null || request.getMarklogicConnectionId().isBlank()) {
+            return ResponseEntity.badRequest().build();
+        }
+        return ResponseEntity.ok(migrationValidationService.validate(request));
+    }
 
     /** Preview row counts per table before running a migration */
     @GetMapping("/v1/migration/preview/{projectId}")

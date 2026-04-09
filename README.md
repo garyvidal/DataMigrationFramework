@@ -11,6 +11,7 @@ This backend enables:
 - **XSD schema generation** — derive XML Schema definitions from project mapping configurations
 - **Batch migration** — run Spring Batch jobs backed by a cursor-driven pipeline with configurable worker threads
 - **CLI migration** — launch and monitor migrations directly from the command line
+- **Ingest transforms** — apply a server-side MarkLogic REST transform to every document on write (configurable per job via the UI or CLI)
 - **Migration packages** — export a project + connections into a single portable JSON file; import via the UI or CLI
 - **Project persistence** — store and retrieve migration projects, mappings, and connection credentials on the filesystem
 - **Observability** — Prometheus metrics endpoint + bundled Grafana dashboard via Docker Compose
@@ -171,6 +172,10 @@ java -jar DataMigrationFramework-1.0.0.jar \
 | `--directory` | `-d` | No | MarkLogic document directory path (default: `/`). Supports `{rootElement}` and `{index}` placeholders |
 | `--collection` | `-c` | No | MarkLogic collection(s) to tag written documents. Comma-separated or repeatable |
 | `--poll-interval` | | No | Progress poll interval in milliseconds (default: `1000`) |
+| `--dry-run` | | No | Count source records and validate config but do not write any documents to MarkLogic |
+| `--validate-only` | | No | Run pre-flight validation checks and print the report. Exit `0` if all checks pass, `1` if any FAIL |
+| `--transform` | | No | Name of a server-side MarkLogic REST transform to apply on ingest |
+| `--transform-param` | | No | Named parameter for the ingest transform, in `key=value` form. Repeatable (or comma-separated) |
 | `--list-projects` | | No | Print all available projects and exit |
 | `--list-connections` | | No | Print all source DB connections and exit |
 | `--list-ml-connections` | | No | Print all MarkLogic connections and exit |
@@ -205,6 +210,15 @@ java -jar DataMigrationFramework-1.0.0.jar \
   --directory "/staging/orders/" \
   --source-password "secret" \
   --marklogic-password "secret"
+
+# Apply a server-side transform on ingest with parameters
+java -jar DataMigrationFramework-1.0.0.jar \
+  --spring.profiles.active=cli \
+  --project "Orders Migration" \
+  --marklogic-connection "ML Production" \
+  --transform my-transform \
+  --transform-param mode=strict \
+  --transform-param version=2
 
 # Discover what's available before running
 java -jar DataMigrationFramework-1.0.0.jar --spring.profiles.active=cli --list-projects
@@ -422,6 +436,7 @@ The encryption key is stored at `~/.DataMigrationFramework/encryption.key`. If t
 - **Metrics**: `MigrationMetrics` exposes Micrometer counters and timers (`ml.docs.written`, `ml.write.errors`, `ml.write.duration`) scraped by Prometheus via `/actuator/prometheus`.
 - **SPA routing**: `SpaController` forwards unmatched paths to `index.html` so the React app handles client-side routing.
 - **Credentials**: Passwords are AES-256-GCM encrypted at rest and never returned to the frontend. The encryption service is idempotent — values already prefixed with `ENC:` are stored unchanged.
+- **Ingest transforms**: An optional MarkLogic REST `ServerTransform` can be attached per job. When a transform name is specified, it is applied to every document via `WriteBatcher.withTransform()` on the DMSDK path, and via the `DocumentManager.write(writeSet, transform)` overload on the synchronous fallback path. Transform parameters (key=value) are passed through to the transform function.
 - **Package portability**: Migration packages contain no passwords. `ENC:` values supplied at import time are machine-local and not transferable between installations.
 - **CORS**: Configured for `http://localhost:5176` and `http://localhost:3000` (dev servers).
 

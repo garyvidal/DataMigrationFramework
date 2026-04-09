@@ -5,6 +5,7 @@ import com.nativelogix.data.migration.framework.model.marklogic.MarkLogicSecurit
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 public class DeploymentJob {
 
@@ -26,6 +27,11 @@ public class DeploymentJob {
     private long processedRecords;
     private String errorMessage;
     private List<String> errors = new ArrayList<>();
+    private boolean dryRun = false;
+    /** Name of a server-side MarkLogic REST transform to apply on ingest (optional). */
+    private String transformName;
+    /** Named parameters passed to the transform (optional). */
+    private Map<String, String> transformParams;
     private OffsetDateTime created;
     private OffsetDateTime startTime;
     private OffsetDateTime endTime;
@@ -78,6 +84,15 @@ public class DeploymentJob {
 
     public List<String> getErrors() { return errors; }
     public void setErrors(List<String> errors) { this.errors = errors != null ? errors : new ArrayList<>(); }
+
+    public boolean isDryRun() { return dryRun; }
+    public void setDryRun(boolean dryRun) { this.dryRun = dryRun; }
+
+    public String getTransformName() { return transformName; }
+    public void setTransformName(String transformName) { this.transformName = transformName; }
+
+    public Map<String, String> getTransformParams() { return transformParams; }
+    public void setTransformParams(Map<String, String> transformParams) { this.transformParams = transformParams; }
 
     public OffsetDateTime getCreated() { return created; }
     public void setCreated(OffsetDateTime created) { this.created = created; }

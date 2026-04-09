@@ -6,6 +6,7 @@ import com.marklogic.client.datamovement.DataMovementManager;
 import com.marklogic.client.datamovement.WriteBatcher;
 import com.marklogic.client.document.DocumentWriteSet;
 import com.marklogic.client.document.GenericDocumentManager;
+import com.marklogic.client.document.ServerTransform;
 import com.marklogic.client.io.DocumentMetadataHandle;
 import com.marklogic.client.io.Format;
 import com.marklogic.client.io.StringHandle;
@@ -72,6 +73,9 @@ public class MarkLogicDocumentWriter implements ItemWriter<DocumentBuildResult>,
     /** Built once in {@link #open} from securityConfig; reused per document. Null means no metadata (ML defaults apply). */
     private DocumentMetadataHandle metadata;
 
+    /** Server-side REST transform to apply on ingest. Null means no transform. */
+    private ServerTransform serverTransform;
+
     /** Captures async batcher failures; checked at the start of each {@link #write} call. */
     private volatile Exception writeError;
 
@@ -103,13 +107,26 @@ public class MarkLogicDocumentWriter implements ItemWriter<DocumentBuildResult>,
         // Build the metadata handle once from the effective security config (permissions, collections, quality, metadata).
         metadata = securityService.buildMetadataHandle(ctx.getSecurityConfig());
 
+        // Build the ServerTransform if a transform name was specified.
+        if (ctx.getTransformName() != null && !ctx.getTransformName().isBlank()) {
+            serverTransform = new ServerTransform(ctx.getTransformName());
+            if (ctx.getTransformParams() != null) {
+                ctx.getTransformParams().forEach(serverTransform::addParameter);
+            }
+            log.debug("MarkLogic ingest transform configured: {}", ctx.getTransformName());
+        }
+
         // Attempt DMSDK WriteBatcher setup. If the connected user lacks rest-reader/rest-writer
         // (needed for GET /v1/internal/forestinfo), fall back to direct DocumentManager writes.
         try {
             dmm = sharedClient.newDataMovementManager();
-            batcher = dmm.newWriteBatcher()
+            WriteBatcher wb = dmm.newWriteBatcher()
                     .withBatchSize(batcherBatchSize)
-                    .withThreadCount(batcherThreadCount)
+                    .withThreadCount(batcherThreadCount);
+            if (serverTransform != null) {
+                wb.withTransform(serverTransform);
+            }
+            batcher = wb
                     .onBatchSuccess(batch -> {
                         int n = batch.getItems().length;
                         metrics.mlDocsWrittenCounter.increment(n);
@@ -188,7 +205,11 @@ public class MarkLogicDocumentWriter implements ItemWriter<DocumentBuildResult>,
                         writeSet.add(doc.getUri(), content);
                     }
                 }
-                directDocManager.write(writeSet);
+                if (serverTransform != null) {
+                    directDocManager.write(writeSet, serverTransform);
+                } else {
+                    directDocManager.write(writeSet);
+                }
                 metrics.mlDocsWrittenCounter.increment(items.size());
                 log.debug("Direct-wrote {} documents to MarkLogic", items.size());
             } else {

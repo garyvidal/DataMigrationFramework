@@ -18,7 +18,11 @@
       "Bash(mv \"c:/Users/garyv/IdeaProjects/DataMigrationFramework/Dockerfile\" \"c:/Users/garyv/IdeaProjects/DataMigrationFramework/docker/Dockerfile\")",
       "Bash(mv \"c:/Users/garyv/IdeaProjects/DataMigrationFramework/docker-compose.yml\" \"c:/Users/garyv/IdeaProjects/DataMigrationFramework/docker/docker-compose.yml\")",
       "Bash(mv \"c:/Users/garyv/IdeaProjects/DataMigrationFramework/prometheus.yml\" \"c:/Users/garyv/IdeaProjects/DataMigrationFramework/docker/prometheus.yml\")",
-      "Bash(mv \"c:/Users/garyv/IdeaProjects/DataMigrationFramework/grafana\" \"c:/Users/garyv/IdeaProjects/DataMigrationFramework/docker/grafana\")"
+      "Bash(mv \"c:/Users/garyv/IdeaProjects/DataMigrationFramework/grafana\" \"c:/Users/garyv/IdeaProjects/DataMigrationFramework/docker/grafana\")",
+      "Bash(grep -l \"class.*Service\" /c/Users/garyv/IdeaProjects/DataMigrationFramework/src/main/java/com/nativelogix/data/migration/framework/service/*.java)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\garyv\\.claude\\projects\\c--Users-garyv-IdeaProjects-DataMigrationFramework\\memory"
     ]
   }
 }
