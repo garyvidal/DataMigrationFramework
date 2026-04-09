@@ -51,6 +51,7 @@ public class RdbmsDocumentReader implements ItemStreamReader<DocumentBuildResult
     private final JoinResolver joinResolver;
     private final XmlDocumentBuilder xmlDocumentBuilder;
     private final JsonDocumentBuilder jsonDocumentBuilder;
+    private final MigrationMetrics metrics;
 
     /** 0 = no offset (full table scan or single partition). */
     private final long partitionOffset;
@@ -100,10 +101,11 @@ public class RdbmsDocumentReader implements ItemStreamReader<DocumentBuildResult
                                 SqlQueryBuilder sqlQueryBuilder,
                                 JoinResolver joinResolver,
                                 XmlDocumentBuilder xmlDocumentBuilder,
-                                JsonDocumentBuilder jsonDocumentBuilder) {
+                                JsonDocumentBuilder jsonDocumentBuilder,
+                                MigrationMetrics metrics) {
         this(ctx, 0L, -1L,
              jdbcConnectionService, sqlQueryBuilder, joinResolver,
-             xmlDocumentBuilder, jsonDocumentBuilder);
+             xmlDocumentBuilder, jsonDocumentBuilder, metrics);
     }
 
     /** Partitioned: reads only the slice [offset, offset + pageSize). */
@@ -114,7 +116,8 @@ public class RdbmsDocumentReader implements ItemStreamReader<DocumentBuildResult
                                 SqlQueryBuilder sqlQueryBuilder,
                                 JoinResolver joinResolver,
                                 XmlDocumentBuilder xmlDocumentBuilder,
-                                JsonDocumentBuilder jsonDocumentBuilder) {
+                                JsonDocumentBuilder jsonDocumentBuilder,
+                                MigrationMetrics metrics) {
         this.ctx                   = ctx;
         this.partitionOffset       = partitionOffset;
         this.partitionPageSize     = partitionPageSize;
@@ -123,6 +126,7 @@ public class RdbmsDocumentReader implements ItemStreamReader<DocumentBuildResult
         this.joinResolver          = joinResolver;
         this.xmlDocumentBuilder    = xmlDocumentBuilder;
         this.jsonDocumentBuilder   = jsonDocumentBuilder;
+        this.metrics               = metrics;
     }
 
     // ── ItemStream ────────────────────────────────────────────────────────────
@@ -179,7 +183,9 @@ public class RdbmsDocumentReader implements ItemStreamReader<DocumentBuildResult
                 rootStmt.setFetchSize(PREFETCH_SIZE);
             }
 
+            long t0 = System.nanoTime();
             rootRs = rootStmt.executeQuery();
+            metrics.recordNanos(metrics.dbRootCursorOpenTimer, System.nanoTime() - t0);
 
         } catch (Exception e) {
             throw new RuntimeException("Failed to open RDBMS cursor: " + e.getMessage(), e);
@@ -218,6 +224,9 @@ public class RdbmsDocumentReader implements ItemStreamReader<DocumentBuildResult
             return;
         }
 
+        metrics.prefetchBatchSizeHistogram.record(rootBatch.size());
+        metrics.rowsReadCounter.increment(rootBatch.size());
+
         Project project = ctx.getProject();
         NamingCase casing = project.getSettings() != null ? project.getSettings().getDefaultCasing() : null;
 
@@ -242,7 +251,9 @@ public class RdbmsDocumentReader implements ItemStreamReader<DocumentBuildResult
                         childData.put(child, List.of());
                     }
                 }
+                long t0 = System.nanoTime();
                 String content = jsonDocumentBuilder.build(jsonRootMapping, rootRow, childData, casing);
+                metrics.recordNanos(metrics.jsonBuildTimer, System.nanoTime() - t0);
                 prefetchQueue.add(new DocumentBuildResult(uri + ".json", content, "JSON"));
             }
 
@@ -268,7 +279,9 @@ public class RdbmsDocumentReader implements ItemStreamReader<DocumentBuildResult
                         childData.put(child, List.of());
                     }
                 }
+                long t0 = System.nanoTime();
                 String content = xmlDocumentBuilder.build(xmlRootMapping, rootRow, childData, casing, namespaces);
+                metrics.recordNanos(metrics.xmlBuildTimer, System.nanoTime() - t0);
                 prefetchQueue.add(new DocumentBuildResult(uri + ".xml", content, "XML"));
             }
         }
@@ -295,6 +308,7 @@ public class RdbmsDocumentReader implements ItemStreamReader<DocumentBuildResult
 
                 String sql = sqlQueryBuilder.buildChildBatchQuery(child, joinPath.childColumn(), parentValues.size());
                 Map<String, List<Map<String, Object>>> grouped = new HashMap<>();
+                long t0 = System.nanoTime();
                 try (PreparedStatement stmt = jdbcConn.prepareStatement(sql)) {
                     for (int i = 0; i < parentValues.size(); i++) stmt.setObject(i + 1, parentValues.get(i));
                     try (ResultSet rs = stmt.executeQuery()) {
@@ -305,6 +319,7 @@ public class RdbmsDocumentReader implements ItemStreamReader<DocumentBuildResult
                         }
                     }
                 }
+                metrics.recordNanos(metrics.dbChildBatchFetchTimer, System.nanoTime() - t0);
                 result.put(child.getId(), grouped);
             } catch (Exception e) {
                 log.warn("Batch child fetch failed for '{}': {}", child.getXmlName(), e.getMessage());
@@ -329,6 +344,7 @@ public class RdbmsDocumentReader implements ItemStreamReader<DocumentBuildResult
 
                 String sql = sqlQueryBuilder.buildChildBatchQuery(child, joinPath.childColumn(), parentValues.size());
                 Map<String, List<Map<String, Object>>> grouped = new HashMap<>();
+                long t0 = System.nanoTime();
                 try (PreparedStatement stmt = jdbcConn.prepareStatement(sql)) {
                     for (int i = 0; i < parentValues.size(); i++) stmt.setObject(i + 1, parentValues.get(i));
                     try (ResultSet rs = stmt.executeQuery()) {
@@ -339,6 +355,7 @@ public class RdbmsDocumentReader implements ItemStreamReader<DocumentBuildResult
                         }
                     }
                 }
+                metrics.recordNanos(metrics.dbChildBatchFetchTimer, System.nanoTime() - t0);
                 result.put(child.getId(), grouped);
             } catch (Exception e) {
                 log.warn("Batch child fetch failed for '{}': {}", child.getJsonName(), e.getMessage());
@@ -484,7 +501,9 @@ public class RdbmsDocumentReader implements ItemStreamReader<DocumentBuildResult
             try {
                 long count = countTableRows(mapping.getSourceSchema(), mapping.getSourceTable());
                 if (count > 0 && count <= LOOKUP_CACHE_THRESHOLD) {
+                    long t0 = System.nanoTime();
                     List<Map<String, Object>> rows = loadAllRows(mapping.getSourceSchema(), mapping.getSourceTable());
+                    metrics.recordNanos(metrics.dbLookupCacheLoadTimer, System.nanoTime() - t0);
                     lookupCacheRows.put(mapping.getId(), rows);
                     cachedMappingIds.add(mapping.getId());
                     log.info("Cached lookup table '{}' ({} rows)", mapping.getSourceTable(), rows.size());
@@ -501,7 +520,9 @@ public class RdbmsDocumentReader implements ItemStreamReader<DocumentBuildResult
             try {
                 long count = countTableRows(mapping.getSourceSchema(), mapping.getSourceTable());
                 if (count > 0 && count <= LOOKUP_CACHE_THRESHOLD) {
+                    long t0 = System.nanoTime();
                     List<Map<String, Object>> rows = loadAllRows(mapping.getSourceSchema(), mapping.getSourceTable());
+                    metrics.recordNanos(metrics.dbLookupCacheLoadTimer, System.nanoTime() - t0);
                     lookupCacheRows.put(mapping.getId(), rows);
                     cachedMappingIds.add(mapping.getId());
                     log.info("Cached lookup table '{}' ({} rows)", mapping.getSourceTable(), rows.size());

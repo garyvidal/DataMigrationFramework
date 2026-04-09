@@ -9,9 +9,11 @@ import com.nativelogix.data.migration.framework.model.project.Project;
 import org.springframework.stereotype.Repository;
 
 import java.io.IOException;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -42,12 +44,25 @@ public class FileSystemProjectRepository implements ProjectRepository {
     @Override
     public Project save(String id, Project project) {
         try {
-            Path filePath = projectsDir.resolve(id + ".json");
-            objectMapper.writeValue(filePath.toFile(), project);
+            Path target = projectsDir.resolve(id + ".json");
+            Path tmp = projectsDir.resolve(id + ".tmp");
+            objectMapper.writeValue(tmp.toFile(), project);
+            try {
+                Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            } catch (AtomicMoveNotSupportedException e) {
+                Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING);
+            }
             return project;
         } catch (IOException e) {
             throw new RuntimeException("Failed to save project: " + e.getMessage(), e);
         }
+    }
+
+    @Override
+    public Optional<Project> findByName(String name) {
+        return findAll().stream()
+                .filter(p -> name.equalsIgnoreCase(p.getName()))
+                .findFirst();
     }
 
     @Override

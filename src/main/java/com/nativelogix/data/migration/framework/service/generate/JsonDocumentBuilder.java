@@ -1,6 +1,7 @@
 package com.nativelogix.data.migration.framework.service.generate;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectWriter;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.nativelogix.data.migration.framework.model.project.JsonColumnMapping;
@@ -28,6 +29,12 @@ public class JsonDocumentBuilder {
     private static final DateTimeFormatter ISO_DATETIME = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectWriter prettyWriter = objectMapper.writerWithDefaultPrettyPrinter();
+    private final JavaScriptFunctionExecutor jsExecutor;
+
+    public JsonDocumentBuilder(JavaScriptFunctionExecutor jsExecutor) {
+        this.jsExecutor = jsExecutor;
+    }
 
     /**
      * A single queried row together with any inline children that must be
@@ -93,7 +100,7 @@ public class JsonDocumentBuilder {
             }
         }
 
-        return objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(root);
+        return prettyWriter.writeValueAsString(root);
     }
 
     // -------------------------------------------------------------------------
@@ -147,12 +154,23 @@ public class JsonDocumentBuilder {
         if (columns == null) return;
 
         for (JsonColumnMapping col : columns) {
-            if ("CUSTOM".equals(col.getMappingType())) continue;
+            String key = col.getJsonKey();
+
+            boolean isCustom = "CUSTOM".equals(col.getMappingType())
+                    || col.getSourceColumn() == null || col.getSourceColumn().isBlank();
+            if (isCustom) {
+                if (col.getCustomFunction() != null && !col.getCustomFunction().isBlank()) {
+                    String value = jsExecutor.evaluate(col.getCustomFunction(), row);
+                    if (value != null) {
+                        putTyped(node, key, value, col.getJsonType());
+                    }
+                }
+                continue;
+            }
 
             Object rawValue = row.get(col.getSourceColumn());
             if (rawValue == null) continue;
 
-            String key = col.getJsonKey();
             putTyped(node, key, rawValue, col.getJsonType());
         }
     }

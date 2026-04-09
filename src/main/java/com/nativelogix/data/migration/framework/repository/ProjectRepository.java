@@ -8,6 +8,7 @@ import java.util.Optional;
 public interface ProjectRepository {
     Project save(String id, Project project);
     Optional<Project> findById(String id);
+    Optional<Project> findByName(String name);
     List<Project> findAll();
     void delete(String id);
     boolean exists(String id);

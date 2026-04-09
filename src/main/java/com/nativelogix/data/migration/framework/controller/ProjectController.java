@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 public class ProjectController {
@@ -21,10 +22,17 @@ public class ProjectController {
         if (project.getName() == null || project.getName().isBlank()) {
             return ResponseEntity.badRequest().build();
         }
-        // Use id as the file key; fall back to name for legacy projects without an id
-        if (project.getId() == null || project.getId().isBlank()) {
-            project.setId(project.getName());
+        boolean isNew = (project.getId() == null || project.getId().isBlank());
+        if (isNew) {
+            // Always generate a UUID for new projects — never use name as id.
+            project.setId(UUID.randomUUID().toString());
         }
+        // Block duplicate names: reject if another project already has this name.
+        projectRepository.findByName(project.getName()).ifPresent(existing -> {
+            if (!existing.getId().equals(project.getId())) {
+                throw new DuplicateProjectNameException(project.getName());
+            }
+        });
         OffsetDateTime now = OffsetDateTime.now();
         if (project.getCreated() == null) {
             project.setCreated(now);
@@ -32,6 +40,21 @@ public class ProjectController {
         project.setModified(now);
         Project saved = projectRepository.save(project.getId(), project);
         return ResponseEntity.ok(saved);
+    }
+
+    @org.springframework.web.bind.annotation.ExceptionHandler(DuplicateProjectNameException.class)
+    public ResponseEntity<String> handleDuplicateName(DuplicateProjectNameException ex) {
+        return ResponseEntity.status(org.springframework.http.HttpStatus.CONFLICT)
+                .body("A project named \"" + ex.getName() + "\" already exists.");
+    }
+
+    static class DuplicateProjectNameException extends RuntimeException {
+        private final String name;
+        DuplicateProjectNameException(String name) {
+            super("Duplicate project name: " + name);
+            this.name = name;
+        }
+        String getName() { return name; }
     }
 
     @GetMapping("/v1/projects")

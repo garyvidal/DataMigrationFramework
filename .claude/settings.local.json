@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls c:/Users/garyv/IdeaProjects/DataMigrationFramework/target/*.jar)",
+      "Bash(netstat -ano)",
+      "Bash(tasklist /FI \"PID eq 27984\" /FO LIST)",
+      "Bash(tasklist /FI \"PID eq 32628\" /FO LIST)",
+      "Bash(cmd /c \"tasklist /FI \\\\\"PID eq 27984\\\\\" /FO LIST && tasklist /FI \\\\\"PID eq 32628\\\\\" /FO LIST\")",
+      "Bash(cmd /c tasklist)",
+      "Bash(wmic process:*)",
+      "Bash(mvn dependency:tree -q)",
+      "Bash(mvn dependency:tree)",
+      "Bash(./mvnw dependency:tree)",
+      "Bash(mvn.cmd dependency:tree)",
+      "Bash(where mvn:*)",
+      "Bash(where mvnw:*)",
+      "Bash(mkdir -p \"c:/Users/garyv/IdeaProjects/DataMigrationFramework/docker\")",
+      "Bash(mv \"c:/Users/garyv/IdeaProjects/DataMigrationFramework/Dockerfile\" \"c:/Users/garyv/IdeaProjects/DataMigrationFramework/docker/Dockerfile\")",
+      "Bash(mv \"c:/Users/garyv/IdeaProjects/DataMigrationFramework/docker-compose.yml\" \"c:/Users/garyv/IdeaProjects/DataMigrationFramework/docker/docker-compose.yml\")",
+      "Bash(mv \"c:/Users/garyv/IdeaProjects/DataMigrationFramework/prometheus.yml\" \"c:/Users/garyv/IdeaProjects/DataMigrationFramework/docker/prometheus.yml\")",
+      "Bash(mv \"c:/Users/garyv/IdeaProjects/DataMigrationFramework/grafana\" \"c:/Users/garyv/IdeaProjects/DataMigrationFramework/docker/grafana\")"
+    ]
+  }
+}

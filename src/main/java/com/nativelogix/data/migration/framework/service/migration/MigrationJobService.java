@@ -24,15 +24,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.batch.core.*;
-import org.springframework.batch.core.job.builder.FlowBuilder;
 import org.springframework.batch.core.job.builder.JobBuilder;
-import org.springframework.batch.core.job.flow.Flow;
-import org.springframework.batch.core.job.flow.support.SimpleFlow;
 import org.springframework.lang.NonNull;
 import org.springframework.batch.core.launch.JobLauncher;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.builder.StepBuilder;
-import org.springframework.batch.item.Chunk;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.stereotype.Service;
@@ -59,13 +55,6 @@ import java.util.concurrent.atomic.AtomicReference;
 @RequiredArgsConstructor
 public class MigrationJobService {
 
-    /** Documents processed per Spring Batch chunk (write transaction). */
-    private static final int  CHUNK_SIZE          = 1000;
-    /** Total root-table rows needed to enable parallel partitioning. */
-    private static final long PARTITION_THRESHOLD = 10_000L;
-    /** Maximum parallel partitions (caps JDBC + ML connections). */
-    private static final int  MAX_PARTITIONS      = 8;
-
     private final FileSystemProjectRepository projectRepository;
     private final FileSystemDeploymentJobRepository jobRepository;
     private final MarkLogicConnectionService markLogicConnectionService;
@@ -78,19 +67,26 @@ public class MigrationJobService {
     private final MarkLogicSecurityService markLogicSecurityService;
     private final JobRepository batchJobRepository;
     private final PlatformTransactionManager transactionManager;
+    private final MigrationMetrics migrationMetrics;
 
     @Qualifier("asyncJobLauncher")
     private final JobLauncher asyncJobLauncher;
 
-    @Qualifier("migrationPartitionTaskExecutor")
-    private final TaskExecutor migrationPartitionTaskExecutor;
+    @Qualifier("migrationDocBuilderExecutor")
+    private final TaskExecutor docBuilderExecutor;
 
-    // ── WriteBatcher configuration (tunable via application.properties) ───────
+    // ── Pipeline tuning (application.properties) ──────────────────────────────
     @Value("${migration.marklogic.batcher.batch-size:500}")
     private int batcherBatchSize;
 
-    @Value("${migration.marklogic.batcher.thread-count:4}")
+    @Value("${migration.marklogic.batcher.thread-count:8}")
     private int batcherThreadCount;
+
+    @Value("${migration.pipeline.worker-threads:0}")   // 0 = auto (CPU count)
+    private int workerThreadCount;
+
+    @Value("${migration.pipeline.queue-capacity:8}")
+    private int queueCapacity;
 
     // ── SSE emitter registry ──────────────────────────────────────────────────
 
@@ -101,8 +97,7 @@ public class MigrationJobService {
     private final ConcurrentHashMap<String, CopyOnWriteArrayList<SseEmitter>> jobEmitters = new ConcurrentHashMap<>();
     /**
      * Epoch-millis timestamp of the last SSE push per job.
-     * Used by {@link #buildWriteListener} to rate-limit events to one every
-     * {@value #SSE_PUSH_INTERVAL_MS} ms regardless of dataset size.
+     * Rate-limits SSE events to one every {@value #SSE_PUSH_INTERVAL_MS} ms.
      */
     private final ConcurrentHashMap<String, AtomicLong> jobLastPushMs = new ConcurrentHashMap<>();
     /** Minimum interval between SSE progress events in milliseconds. */
@@ -332,49 +327,49 @@ public class MigrationJobService {
     // ── Job launching ─────────────────────────────────────────────────────────
 
     /**
-     * Builds and launches the Spring Batch job.  When {@code totalRecords >= PARTITION_THRESHOLD}
-     * the root table is split across up to {@value #MAX_PARTITIONS} parallel flows, each backed
-     * by its own reader/writer and JDBC connection.
+     * Builds and launches a Spring Batch job backed by a single {@link CursorPipelineTasklet}.
+     *
+     * <p>The tasklet opens one streaming JDBC cursor (no OFFSET), feeds batches into a
+     * {@link java.util.concurrent.BlockingQueue}, and runs N worker threads that concurrently
+     * batch-fetch child rows and build documents before adding them to a shared DMSDK
+     * {@link com.marklogic.client.datamovement.WriteBatcher}.</p>
      */
     private void launchBatchJob(String jobId, MigrationJobContext ctx, long totalRecords) {
-        int partitionCount = (totalRecords >= PARTITION_THRESHOLD)
-                ? Math.min(MAX_PARTITIONS, Runtime.getRuntime().availableProcessors())
-                : 1;
-
-        // Shared counter updated by all partitions; used by the job listener for the final count.
         AtomicLong processedCounter = new AtomicLong(0);
-        // Populated by beforeJob listener; needed by SSE push to compute elapsed seconds.
         AtomicReference<OffsetDateTime> startTimeRef = new AtomicReference<>();
-        // Initialize SSE push-time tracking and live counter for this job.
         jobLastPushMs.put(jobId, new AtomicLong(0));
         liveProcessedCounters.put(jobId, processedCounter);
 
-        List<Flow> flows = new ArrayList<>(partitionCount);
-        if (partitionCount == 1) {
-            flows.add(buildPartitionFlow(jobId, ctx, 0L, -1L, 0, processedCounter, totalRecords, startTimeRef));
-        } else {
-            long rowsPerPartition = (totalRecords + partitionCount - 1) / partitionCount;
-            for (int i = 0; i < partitionCount; i++) {
-                long offset   = (long) i * rowsPerPartition;
-                if (offset >= totalRecords) break;
-                long pageSize = Math.min(rowsPerPartition, totalRecords - offset);
-                flows.add(buildPartitionFlow(jobId, ctx, offset, pageSize, i, processedCounter, totalRecords, startTimeRef));
-            }
-            log.info("Job {} will run {} parallel partitions (~{} rows each)",
-                    jobId, flows.size(), rowsPerPartition);
-        }
+        int workers = workerThreadCount > 0
+                ? workerThreadCount
+                : Math.min(16, Runtime.getRuntime().availableProcessors());
 
-        Flow mainFlow = (flows.size() == 1)
-                ? flows.get(0)
-                : new FlowBuilder<SimpleFlow>("splitFlow-" + jobId)
-                        .split(migrationPartitionTaskExecutor)
-                        .add(flows.toArray(new Flow[0]))
-                        .build();
+        CursorPipelineTasklet tasklet = new CursorPipelineTasklet(
+                ctx,
+                jdbcConnectionService,
+                sqlQueryBuilder,
+                joinResolver,
+                xmlDocumentBuilder,
+                jsonDocumentBuilder,
+                passwordEncryptionService,
+                markLogicSecurityService,
+                migrationMetrics,
+                docBuilderExecutor,
+                workers,
+                batcherBatchSize,
+                batcherThreadCount,
+                queueCapacity,
+                processedCounter);
+
+        // Wrap progress pushes in a StepExecutionListener so the SSE ticker still fires.
+        Step step = new StepBuilder("migrationStep-" + jobId, batchJobRepository)
+                .tasklet(tasklet, transactionManager)
+                .listener(buildSseStepListener(jobId, processedCounter, totalRecords, startTimeRef))
+                .build();
 
         Job batchJob = new JobBuilder("migrationJob-" + jobId, batchJobRepository)
-                .start(mainFlow)
-                .end()
-                .listener(buildJobListener(jobId, processedCounter, totalRecords, startTimeRef))
+                .start(step)
+                .listener(buildJobListener(jobId, processedCounter, startTimeRef))
                 .build();
 
         JobParameters params = new JobParametersBuilder()
@@ -382,6 +377,8 @@ public class MigrationJobService {
                 .addLong("startTime", System.currentTimeMillis())
                 .toJobParameters();
 
+        log.info("Job {} launching cursor pipeline — {} worker threads, batcher threads={}",
+                jobId, workers, batcherThreadCount);
         try {
             asyncJobLauncher.run(batchJob, params);
         } catch (Exception e) {
@@ -395,47 +392,18 @@ public class MigrationJobService {
         }
     }
 
-    /**
-     * Builds one partition flow: a step with its own {@link RdbmsDocumentReader} and
-     * {@link MarkLogicDocumentWriter} (each maintaining their own JDBC / ML connections).
-     */
-    private Flow buildPartitionFlow(String jobId, MigrationJobContext ctx,
-                                    long offset, long pageSize, int index,
-                                    AtomicLong processedCounter, long totalRecords,
-                                    AtomicReference<OffsetDateTime> startTimeRef) {
-        RdbmsDocumentReader reader = new RdbmsDocumentReader(
-                ctx, offset, pageSize,
-                jdbcConnectionService, sqlQueryBuilder, joinResolver,
-                xmlDocumentBuilder, jsonDocumentBuilder);
-
-        MarkLogicDocumentWriter writer = new MarkLogicDocumentWriter(ctx, passwordEncryptionService,
-                markLogicSecurityService, batcherBatchSize, batcherThreadCount);
-
-        Step step = new StepBuilder("migrationStep-" + jobId + "-" + index, batchJobRepository)
-                .<DocumentBuildResult, DocumentBuildResult>chunk(CHUNK_SIZE, transactionManager)
-                .reader(reader)
-                .writer(writer)
-                .listener(buildWriteListener(jobId, processedCounter, totalRecords, startTimeRef))
-                .build();
-
-        return new FlowBuilder<SimpleFlow>("partitionFlow-" + jobId + "-" + index)
-                .start(step)
-                .build();
-    }
-
     // ── Listeners ─────────────────────────────────────────────────────────────
 
     /**
-     * Job-level listener: marks the job RUNNING on start, and COMPLETED/FAILED on finish.
-     * Using a job listener (rather than a step listener) works correctly for both single and
-     * multi-partition runs because it fires once when the entire job finishes.
+     * Job-level listener: marks the job RUNNING on start, COMPLETED/FAILED on finish,
+     * flushes SSE emitters, and cleans up per-job state.
      */
     private JobExecutionListener buildJobListener(String jobId, AtomicLong processedCounter,
-                                                   long totalRecords,
                                                    AtomicReference<OffsetDateTime> startTimeRef) {
         return new JobExecutionListener() {
             @Override
             public void beforeJob(@NonNull JobExecution jobExecution) {
+                migrationMetrics.jobStarted();
                 jobRepository.findById(jobId).ifPresent(job -> {
                     job.setStatus(DeploymentJobStatus.RUNNING);
                     OffsetDateTime now = OffsetDateTime.now();
@@ -447,6 +415,7 @@ public class MigrationJobService {
 
             @Override
             public void afterJob(@NonNull JobExecution jobExecution) {
+                migrationMetrics.jobFinished();
                 jobRepository.findById(jobId).ifPresent(job -> {
                     boolean anyFailed = jobExecution.getStepExecutions().stream()
                             .anyMatch(se -> se.getStatus() == BatchStatus.FAILED);
@@ -463,7 +432,6 @@ public class MigrationJobService {
                     jobRepository.save(job);
                 });
 
-                // Push final "complete" event and close all emitters for this job
                 liveProcessedCounters.remove(jobId);
                 CopyOnWriteArrayList<SseEmitter> emitters = jobEmitters.remove(jobId);
                 jobLastPushMs.remove(jobId);
@@ -482,26 +450,41 @@ public class MigrationJobService {
     }
 
     /**
-     * Write-level listener: increments the shared counter and pushes an SSE progress event
-     * at most once every {@value #SSE_PUSH_INTERVAL_MS} ms.  CAS on the timestamp prevents
-     * duplicate pushes when concurrent partition threads both notice the interval has elapsed.
+     * Step-level listener that fires periodic SSE progress pushes.
+     * The tasklet updates {@code processedCounter} directly; this listener polls it
+     * on a CAS-gated 2-second interval so the UI stays responsive during long runs.
      */
-    private ItemWriteListener<DocumentBuildResult> buildWriteListener(
-            String jobId, AtomicLong processedCounter, long totalRecords,
-            AtomicReference<OffsetDateTime> startTimeRef) {
-        return new ItemWriteListener<>() {
+    private StepExecutionListener buildSseStepListener(String jobId, AtomicLong processedCounter,
+                                                        long totalRecords,
+                                                        AtomicReference<OffsetDateTime> startTimeRef) {
+        return new StepExecutionListener() {
+            // Background ticker thread — cancelled in afterStep.
+            private volatile java.util.concurrent.ScheduledFuture<?> ticker;
+            private final java.util.concurrent.ScheduledExecutorService scheduler =
+                    java.util.concurrent.Executors.newSingleThreadScheduledExecutor(r -> {
+                        Thread t = new Thread(r, "sse-ticker-" + jobId);
+                        t.setDaemon(true);
+                        return t;
+                    });
+
             @Override
-            public void afterWrite(@NonNull Chunk<? extends DocumentBuildResult> items) {
-                long processed = processedCounter.addAndGet(items.size());
+            public void beforeStep(@NonNull StepExecution stepExecution) {
+                ticker = scheduler.scheduleAtFixedRate(() -> {
+                    AtomicLong lastPush = jobLastPushMs.get(jobId);
+                    if (lastPush == null) return;
+                    long now = System.currentTimeMillis();
+                    long prev = lastPush.get();
+                    if (now - prev >= SSE_PUSH_INTERVAL_MS && lastPush.compareAndSet(prev, now)) {
+                        pushSseEvent(jobId, "progress", processedCounter.get(), totalRecords, startTimeRef);
+                    }
+                }, SSE_PUSH_INTERVAL_MS, SSE_PUSH_INTERVAL_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
+            }
 
-                AtomicLong lastPush = jobLastPushMs.get(jobId);
-                if (lastPush == null) return;
-
-                long now  = System.currentTimeMillis();
-                long prev = lastPush.get();
-                if (now - prev >= SSE_PUSH_INTERVAL_MS && lastPush.compareAndSet(prev, now)) {
-                    pushSseEvent(jobId, "progress", processed, totalRecords, startTimeRef);
-                }
+            @Override
+            public ExitStatus afterStep(@NonNull StepExecution stepExecution) {
+                if (ticker != null) ticker.cancel(false);
+                scheduler.shutdown();
+                return stepExecution.getExitStatus();
             }
         };
     }

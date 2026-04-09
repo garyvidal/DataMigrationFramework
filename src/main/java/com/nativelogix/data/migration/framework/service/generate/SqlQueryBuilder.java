@@ -120,19 +120,23 @@ public class SqlQueryBuilder {
     private String buildXmlSelectList(XmlTableMapping mapping) {
         List<XmlColumnMapping> cols = mapping.getColumns();
         if (cols == null || cols.isEmpty()) return "*";
-        return cols.stream()
+        List<String> selected = cols.stream()
                 .filter(c -> !"CUSTOM".equals(c.getMappingType()))
+                .filter(c -> c.getSourceColumn() != null && !c.getSourceColumn().isBlank())
                 .map(c -> quote(c.getSourceColumn()))
-                .collect(Collectors.joining(", "));
+                .collect(Collectors.toList());
+        return selected.isEmpty() ? "*" : String.join(", ", selected);
     }
 
     private String buildJsonSelectList(JsonTableMapping mapping) {
         List<JsonColumnMapping> cols = mapping.getColumns();
         if (cols == null || cols.isEmpty()) return "*";
-        return cols.stream()
+        List<String> selected = cols.stream()
                 .filter(c -> !"CUSTOM".equals(c.getMappingType()))
+                .filter(c -> c.getSourceColumn() != null && !c.getSourceColumn().isBlank())
                 .map(c -> quote(c.getSourceColumn()))
-                .collect(Collectors.joining(", "));
+                .collect(Collectors.toList());
+        return selected.isEmpty() ? "*" : String.join(", ", selected);
     }
 
     private String qualifiedTable(String schema, String table) {

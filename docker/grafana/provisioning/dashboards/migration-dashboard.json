@@ -1,0 +1,287 @@
+{
+  "title": "Data Migration Framework",
+  "uid": "datamigration",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "5s",
+  "time": { "from": "now-30m", "to": "now" },
+  "panels": [
+
+    {
+      "id": 1,
+      "title": "Active Jobs",
+      "type": "stat",
+      "gridPos": { "x": 0, "y": 0, "w": 4, "h": 4 },
+      "options": { "colorMode": "background", "graphMode": "none" },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        }
+      },
+      "targets": [{
+        "expr": "job_active",
+        "legendFormat": "Active Jobs",
+        "datasource": "Prometheus"
+      }]
+    },
+
+    {
+      "id": 2,
+      "title": "Total Rows Read",
+      "type": "stat",
+      "gridPos": { "x": 4, "y": 0, "w": 4, "h": 4 },
+      "options": { "colorMode": "value", "graphMode": "area" },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "targets": [{
+        "expr": "reader_rows_read_total",
+        "legendFormat": "Rows Read",
+        "datasource": "Prometheus"
+      }]
+    },
+
+    {
+      "id": 3,
+      "title": "Docs Written to MarkLogic",
+      "type": "stat",
+      "gridPos": { "x": 8, "y": 0, "w": 4, "h": 4 },
+      "options": { "colorMode": "value", "graphMode": "area" },
+      "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "fixed", "fixedColor": "blue" } } },
+      "targets": [{
+        "expr": "ml_docs_written_total",
+        "legendFormat": "Docs Written",
+        "datasource": "Prometheus"
+      }]
+    },
+
+    {
+      "id": 4,
+      "title": "Write Errors",
+      "type": "stat",
+      "gridPos": { "x": 12, "y": 0, "w": 4, "h": 4 },
+      "options": { "colorMode": "background", "graphMode": "none" },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        }
+      },
+      "targets": [{
+        "expr": "ml_write_errors_total",
+        "legendFormat": "Errors",
+        "datasource": "Prometheus"
+      }]
+    },
+
+    {
+      "id": 5,
+      "title": "Rows Read / sec",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 8 },
+      "fieldConfig": { "defaults": { "unit": "rps", "custom": { "lineWidth": 2 } } },
+      "targets": [{
+        "expr": "rate(reader_rows_read_total[30s])",
+        "legendFormat": "Rows/sec",
+        "datasource": "Prometheus"
+      }]
+    },
+
+    {
+      "id": 6,
+      "title": "Docs Written / sec",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 },
+      "fieldConfig": { "defaults": { "unit": "rps", "custom": { "lineWidth": 2 } } },
+      "targets": [{
+        "expr": "rate(ml_docs_written_total{application=\"DataMigrationFramework\"}[30s])",
+        "legendFormat": "Docs/sec",
+        "datasource": "Prometheus"
+      }]
+    },
+
+    {
+      "id": 7,
+      "title": "Database — Root Cursor Open Time",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 12, "w": 12, "h": 8 },
+      "fieldConfig": { "defaults": { "unit": "s", "custom": { "lineWidth": 2 } } },
+      "targets": [
+        {
+          "expr": "db_root_cursor_open_seconds{application=\"DataMigrationFramework\", quantile=\"0.5\"}",
+          "legendFormat": "p50",
+          "datasource": "Prometheus"
+        },
+        {
+          "expr": "db_root_cursor_open_seconds{application=\"DataMigrationFramework\", quantile=\"0.95\"}",
+          "legendFormat": "p95",
+          "datasource": "Prometheus"
+        },
+        {
+          "expr": "db_root_cursor_open_seconds{application=\"DataMigrationFramework\", quantile=\"0.99\"}",
+          "legendFormat": "p99",
+          "datasource": "Prometheus"
+        }
+      ]
+    },
+
+    {
+      "id": 8,
+      "title": "Database — Batch Child Fetch Time",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 12, "w": 12, "h": 8 },
+      "fieldConfig": { "defaults": { "unit": "s", "custom": { "lineWidth": 2 } } },
+      "targets": [
+        {
+          "expr": "db_child_batch_fetch_seconds{application=\"DataMigrationFramework\", quantile=\"0.5\"}",
+          "legendFormat": "p50",
+          "datasource": "Prometheus"
+        },
+        {
+          "expr": "db_child_batch_fetch_seconds{application=\"DataMigrationFramework\", quantile=\"0.95\"}",
+          "legendFormat": "p95",
+          "datasource": "Prometheus"
+        },
+        {
+          "expr": "db_child_batch_fetch_seconds{application=\"DataMigrationFramework\", quantile=\"0.99\"}",
+          "legendFormat": "p99",
+          "datasource": "Prometheus"
+        }
+      ]
+    },
+
+    {
+      "id": 9,
+      "title": "Document Build Time — XML vs JSON",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 20, "w": 12, "h": 8 },
+      "fieldConfig": { "defaults": { "unit": "s", "custom": { "lineWidth": 2 } } },
+      "targets": [
+        {
+          "expr": "build_xml_document_seconds{application=\"DataMigrationFramework\", quantile=\"0.95\"}",
+          "legendFormat": "XML p95",
+          "datasource": "Prometheus"
+        },
+        {
+          "expr": "build_json_document_seconds{application=\"DataMigrationFramework\", quantile=\"0.95\"}",
+          "legendFormat": "JSON p95",
+          "datasource": "Prometheus"
+        },
+        {
+          "expr": "build_xml_document_seconds{application=\"DataMigrationFramework\", quantile=\"0.99\"}",
+          "legendFormat": "XML p99",
+          "datasource": "Prometheus"
+        },
+        {
+          "expr": "build_json_document_seconds{application=\"DataMigrationFramework\", quantile=\"0.99\"}",
+          "legendFormat": "JSON p99",
+          "datasource": "Prometheus"
+        }
+      ]
+    },
+
+    {
+      "id": 10,
+      "title": "MarkLogic Write Chunk Latency",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 20, "w": 12, "h": 8 },
+      "fieldConfig": { "defaults": { "unit": "s", "custom": { "lineWidth": 2 } } },
+      "targets": [
+        {
+          "expr": "ml_write_chunk_seconds{application=\"DataMigrationFramework\", quantile=\"0.5\"}",
+          "legendFormat": "p50",
+          "datasource": "Prometheus"
+        },
+        {
+          "expr": "ml_write_chunk_seconds{application=\"DataMigrationFramework\", quantile=\"0.95\"}",
+          "legendFormat": "p95",
+          "datasource": "Prometheus"
+        },
+        {
+          "expr": "ml_write_chunk_seconds{application=\"DataMigrationFramework\", quantile=\"0.99\"}",
+          "legendFormat": "p99",
+          "datasource": "Prometheus"
+        }
+      ]
+    },
+
+    {
+      "id": 11,
+      "title": "Lookup Cache Load Time",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 28, "w": 12, "h": 8 },
+      "fieldConfig": { "defaults": { "unit": "s", "custom": { "lineWidth": 2 } } },
+      "targets": [
+        {
+          "expr": "db_lookup_cache_load_seconds_sum{application=\"DataMigrationFramework\"} / db_lookup_cache_load_seconds_count{application=\"DataMigrationFramework\"}",
+          "legendFormat": "Avg cache load time",
+          "datasource": "Prometheus"
+        }
+      ]
+    },
+
+    {
+      "id": 12,
+      "title": "Prefetch Batch Size Distribution",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 28, "w": 12, "h": 8 },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "lineWidth": 2 } } },
+      "targets": [
+        {
+          "expr": "reader_prefetch_batch_size{application=\"DataMigrationFramework\", quantile=\"0.5\"}",
+          "legendFormat": "p50 batch size",
+          "datasource": "Prometheus"
+        },
+        {
+          "expr": "reader_prefetch_batch_size{application=\"DataMigrationFramework\", quantile=\"0.95\"}",
+          "legendFormat": "p95 batch size",
+          "datasource": "Prometheus"
+        }
+      ]
+    },
+
+    {
+      "id": 13,
+      "title": "Batch Child Fetch Rate",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 36, "w": 12, "h": 8 },
+      "fieldConfig": { "defaults": { "unit": "ops", "custom": { "lineWidth": 2 } } },
+      "targets": [{
+        "expr": "rate(db_child_batch_fetch_seconds_count{application=\"DataMigrationFramework\"}[30s])",
+        "legendFormat": "Child fetches/sec",
+        "datasource": "Prometheus"
+      }]
+    },
+
+    {
+      "id": 14,
+      "title": "JVM Memory Used",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 36, "w": 12, "h": 8 },
+      "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "lineWidth": 2 } } },
+      "targets": [
+        {
+          "expr": "jvm_memory_used_bytes{application=\"DataMigrationFramework\", area=\"heap\"}",
+          "legendFormat": "Heap: {{id}}",
+          "datasource": "Prometheus"
+        },
+        {
+          "expr": "jvm_memory_used_bytes{application=\"DataMigrationFramework\", area=\"nonheap\"}",
+          "legendFormat": "Non-Heap: {{id}}",
+          "datasource": "Prometheus"
+        }
+      ]
+    }
+
+  ]
+}

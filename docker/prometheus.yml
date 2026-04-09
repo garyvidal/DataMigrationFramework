@@ -1,0 +1,17 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  # Scrape the Spring Boot app's Prometheus actuator endpoint
+  - job_name: 'datamigration'
+    metrics_path: /actuator/prometheus
+    static_configs:
+      # host.docker.internal resolves to the Windows host from inside Docker Desktop
+      - targets: ['host.docker.internal:9390']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'DataMigrationFramework'
+      - target_label: application
+        replacement: 'DataMigrationFramework'

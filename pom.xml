@@ -19,6 +19,10 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <!-- Override with -Dfrontend.workingDirectory=frontend/app in CI -->
         <frontend.workingDirectory>../DataMigrationFramework-Web/app</frontend.workingDirectory>
+        <!-- Lock Jackson to the Spring Boot managed version.
+             marklogic-client-api declares jackson-databind 2.20.0 directly, which
+             Maven's nearest-wins rule would otherwise let override the BOM. -->
+        <jackson-bom.version>2.18.2</jackson-bom.version>
     </properties>
     <dependencies>
         <dependency>
@@ -114,6 +118,21 @@
             <artifactId>marklogic-client-api</artifactId>
             <version>8.0.0</version>
             <scope>compile</scope>
+        </dependency>
+        <!-- Mozilla Rhino — pure-Java JavaScript engine for CUSTOM field functions -->
+        <dependency>
+            <groupId>org.mozilla</groupId>
+            <artifactId>rhino</artifactId>
+            <version>1.7.15</version>
+        </dependency>
+        <!-- Spring Boot Actuator + Micrometer for metrics (Prometheus endpoint) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
         </dependency>
         <!-- Spring Batch for large-scale data migration -->
         <dependency>

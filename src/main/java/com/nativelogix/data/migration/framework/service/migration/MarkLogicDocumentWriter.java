@@ -42,11 +42,12 @@ import java.util.List;
  */
 public class MarkLogicDocumentWriter implements ItemWriter<DocumentBuildResult>, ItemStream {
 
-    private static final Logger log = LoggerFactory.getLogger(MarkLogicDocumentWriter.class);
+    private static final Logger log = LoggerFactory.getLogger(  MarkLogicDocumentWriter.class);
 
     private final MigrationJobContext ctx;
     private final PasswordEncryptionService encryptionService;
     private final MarkLogicSecurityService securityService;
+    private final MigrationMetrics metrics;
     /** Documents per HTTP request sent by each WriteBatcher worker thread. */
     private final int batcherBatchSize;
     /** Parallel HTTP writer threads within the WriteBatcher. */
@@ -76,10 +77,12 @@ public class MarkLogicDocumentWriter implements ItemWriter<DocumentBuildResult>,
 
     public MarkLogicDocumentWriter(MigrationJobContext ctx, PasswordEncryptionService encryptionService,
                                    MarkLogicSecurityService securityService,
+                                   MigrationMetrics metrics,
                                    int batcherBatchSize, int batcherThreadCount) {
         this.ctx                = ctx;
         this.encryptionService  = encryptionService;
         this.securityService    = securityService;
+        this.metrics            = metrics;
         this.batcherBatchSize   = batcherBatchSize;
         this.batcherThreadCount = batcherThreadCount;
     }
@@ -107,9 +110,13 @@ public class MarkLogicDocumentWriter implements ItemWriter<DocumentBuildResult>,
             batcher = dmm.newWriteBatcher()
                     .withBatchSize(batcherBatchSize)
                     .withThreadCount(batcherThreadCount)
-                    .onBatchSuccess(batch ->
-                            log.debug("WriteBatcher wrote batch of {} docs", batch.getItems().length))
+                    .onBatchSuccess(batch -> {
+                        int n = batch.getItems().length;
+                        metrics.mlDocsWrittenCounter.increment(n);
+                        log.debug("WriteBatcher wrote batch of {} docs", n);
+                    })
                     .onBatchFailure((batch, throwable) -> {
+                        metrics.mlWriteErrorCounter.increment(batch.getItems().length);
                         log.error("WriteBatcher batch failed: {}", throwable.getMessage(), throwable);
                         writeError = new RuntimeException(
                                 "MarkLogic write failed: " + throwable.getMessage(), throwable);
@@ -166,34 +173,40 @@ public class MarkLogicDocumentWriter implements ItemWriter<DocumentBuildResult>,
 
         Format format = "JSON".equalsIgnoreCase(items.get(0).getFormat()) ? Format.JSON : Format.XML;
 
-        if (directWrite) {
-            // Fallback path: synchronous writes via DocumentWriteSet.
-            // DocumentMetadataHandle implements GenericWriteHandle so write(uri, metadata, content)
-            // resolves to the wrong overload — DocumentWriteSet.add() is correctly typed.
-            DocumentWriteSet writeSet = directDocManager.newWriteSet();
-            for (DocumentBuildResult doc : items) {
-                StringHandle content = new StringHandle(doc.getContent()).withFormat(format);
-                if (metadata != null) {
-                    writeSet.add(doc.getUri(), metadata, content);
-                } else {
-                    writeSet.add(doc.getUri(), content);
+        long t0 = System.nanoTime();
+        try {
+            if (directWrite) {
+                // Fallback path: synchronous writes via DocumentWriteSet.
+                // DocumentMetadataHandle implements GenericWriteHandle so write(uri, metadata, content)
+                // resolves to the wrong overload — DocumentWriteSet.add() is correctly typed.
+                DocumentWriteSet writeSet = directDocManager.newWriteSet();
+                for (DocumentBuildResult doc : items) {
+                    StringHandle content = new StringHandle(doc.getContent()).withFormat(format);
+                    if (metadata != null) {
+                        writeSet.add(doc.getUri(), metadata, content);
+                    } else {
+                        writeSet.add(doc.getUri(), content);
+                    }
                 }
-            }
-            directDocManager.write(writeSet);
-            log.debug("Direct-wrote {} documents to MarkLogic", items.size());
-        } else {
-            // Normal path: queue into DMSDK WriteBatcher for parallel async writes.
-            for (DocumentBuildResult doc : items) {
-                StringHandle content = new StringHandle(doc.getContent()).withFormat(format);
-                if (metadata != null) {
-                    batcher.add(doc.getUri(), metadata, content);
-                } else {
-                    batcher.add(doc.getUri(), content);
+                directDocManager.write(writeSet);
+                metrics.mlDocsWrittenCounter.increment(items.size());
+                log.debug("Direct-wrote {} documents to MarkLogic", items.size());
+            } else {
+                // Normal path: queue into DMSDK WriteBatcher for parallel async writes.
+                for (DocumentBuildResult doc : items) {
+                    StringHandle content = new StringHandle(doc.getContent()).withFormat(format);
+                    if (metadata != null) {
+                        batcher.add(doc.getUri(), metadata, content);
+                    } else {
+                        batcher.add(doc.getUri(), content);
+                    }
                 }
+                // The batcher auto-flushes when BATCHER_BATCH_SIZE is reached on its worker threads.
+                // Remaining buffered docs are flushed in close() via flushAndWait().
+                log.debug("Queued {} documents to WriteBatcher", items.size());
             }
-            // The batcher auto-flushes when BATCHER_BATCH_SIZE is reached on its worker threads.
-            // Remaining buffered docs are flushed in close() via flushAndWait().
-            log.debug("Queued {} documents to WriteBatcher", items.size());
+        } finally {
+            metrics.recordNanos(metrics.mlWriteTimer, System.nanoTime() - t0);
         }
     }
 
