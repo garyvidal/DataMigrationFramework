@@ -7,10 +7,13 @@ A Spring Boot REST API that powers the RDBMS-to-MarkLogic data migration framewo
 This backend enables:
 - **Schema analysis** — introspect relational databases (PostgreSQL, Oracle, SQL Server, MySQL) using SchemaCrawler
 - **Document generation** — build XML and JSON documents from mapping definitions and live RDBMS data
-- **Batch migration** — run Spring Batch jobs to read from RDBMS and write documents to MarkLogic at scale
+- **Custom field functions** — evaluate per-field JavaScript expressions (via Mozilla Rhino) for computed values in XML and JSON mappings
+- **XSD schema generation** — derive XML Schema definitions from project mapping configurations
+- **Batch migration** — run Spring Batch jobs backed by a cursor-driven pipeline with configurable worker threads
 - **CLI migration** — launch and monitor migrations directly from the command line
 - **Migration packages** — export a project + connections into a single portable JSON file; import via the UI or CLI
 - **Project persistence** — store and retrieve migration projects, mappings, and connection credentials on the filesystem
+- **Observability** — Prometheus metrics endpoint + bundled Grafana dashboard via Docker Compose
 - **Frontend support** — serves the bundled React frontend in production
 
 ## Tech Stack
@@ -24,8 +27,11 @@ This backend enables:
 | Batch processing | Spring Batch (H2 metadata DB) |
 | MarkLogic client | MarkLogic Client API 8.0 |
 | JDBC drivers | PostgreSQL 42.7, Oracle ojdbc11 23.7, MSSQL 12.8 |
+| JavaScript engine | Mozilla Rhino 1.7.15 (custom field functions) |
 | CLI parsing | Picocli 4.7 |
 | Credentials | AES-256-GCM encryption at rest |
+| Metrics | Spring Actuator + Micrometer (Prometheus) |
+| Observability | Prometheus + Grafana (Docker Compose) |
 | Frontend bundling | `frontend-maven-plugin` (Node 22 + Vite) |
 
 ## Prerequisites
@@ -127,8 +133,10 @@ This is additive — the built-in defaults still apply for anything not overridd
 |---|---|---|
 | `server.port` | `9390` | API server port |
 | `cors.allowed-origins` | `http://localhost:5176,http://localhost:5173` | Comma-separated allowed browser origins |
-| `migration.marklogic.batcher.batch-size` | `1000` | Documents per MarkLogic HTTP request |
-| `migration.marklogic.batcher.thread-count` | `4` | Parallel WriteBatcher writer threads |
+| `migration.marklogic.batcher.batch-size` | `500` | Documents per MarkLogic HTTP request |
+| `migration.marklogic.batcher.thread-count` | `8` | Parallel WriteBatcher writer threads |
+| `migration.pipeline.worker-threads` | `0` (auto) | Cursor pipeline worker threads; `0` = number of CPUs, max 16 |
+| `migration.pipeline.queue-capacity` | `8` | Root-row batch queue depth between cursor and workers |
 | `schemacrawler.schema.pattern.exclude` | `dbo\|sys\|SYS\|...` | Regex of schema names to exclude from introspection |
 | `logging.level.root` | *(Spring default)* | Root log level (`TRACE`, `DEBUG`, `INFO`, `WARN`, `ERROR`) |
 | `logging.level.com.nativelogix...` | `DEBUG` | Framework class log level |
@@ -321,6 +329,11 @@ POST   /v1/projects/{id}/generate/json/preview   JSON document preview
 ```
 Returns up to 100 sample documents built from live RDBMS data.
 
+### XML Schema Generation
+```
+POST   /v1/xml-schema/generate   Generate an XSD from the project's XML mapping definition
+```
+
 ### MarkLogic Connections
 ```
 POST   /v1/marklogic/connections           Save ML connection
@@ -374,8 +387,11 @@ src/main/java/com/nativelogix/data/migration/framework/
 │   ├── PackageService.java        # Export (strip passwords) / import (skip existing by ID)
 │   ├── PasswordEncryptionService.java
 │   ├── generate/                  # XmlGenerationService, JsonGenerationService,
-│   │                              # SqlQueryBuilder, JoinResolver, document builders
-│   └── migration/                 # Spring Batch config, reader, writer, job service
+│   │                              # SqlQueryBuilder, JoinResolver, XmlSchemaGenerationService,
+│   │                              # XmlDocumentBuilder, JsonDocumentBuilder,
+│   │                              # JavaScriptFunctionExecutor (Rhino)
+│   └── migration/                 # Spring Batch config, CursorPipelineTasklet,
+│                                  # MigrationJobService, MigrationMetrics
 ├── repository/                    # Filesystem-backed repositories
 └── util/                          # Case conversion, type mapping
 ```
@@ -396,12 +412,40 @@ The encryption key is stored at `~/.DataMigrationFramework/encryption.key`. If t
 
 ## Key Implementation Notes
 
-- **Spring Batch**: H2 in-memory metadata DB; jobs are triggered via `POST /v1/migration/jobs` or the CLI — not auto-started on launch.
-- **Partitioning**: Jobs with ≥10,000 root rows are automatically split into up to 8 parallel partitions for throughput.
+- **Cursor pipeline**: Each migration job opens one streaming JDBC cursor (no OFFSET paging) and fans out to N configurable worker threads via a `BlockingQueue`. Workers batch-fetch child rows and build documents concurrently before handing off to a shared DMSDK `WriteBatcher`. This replaces the previous parallel-partition approach and eliminates the need for row-count-based partitioning.
+- **Spring Batch**: H2 in-memory metadata DB; jobs are triggered via `POST /v1/migration/jobs` or the CLI — not auto-started on launch. Each job is a single `TaskletStep` wrapping `CursorPipelineTasklet`.
+- **Custom field functions**: Set `mappingType: CUSTOM` on any column and provide a JavaScript expression in `customFunction`. The expression is evaluated by Mozilla Rhino with the current row available as a map of column values. Works for both XML and JSON mappings.
+- **XML serialization**: `XmlDocumentBuilder` uses `StringBuilder`-based serialization rather than DOM + `TransformerFactory`, eliminating per-document service-loader overhead. `DocumentBuilderFactory` is a static singleton; `DocumentBuilder` is pooled per thread via `ThreadLocal`.
+- **XSD generation**: `XmlSchemaGenerationService` derives an XSD from a project's XML mapping definition, available via `POST /v1/xml-schema/generate`.
+- **Project IDs**: New projects always receive a UUID — name-as-ID fallback has been removed. Duplicate project names return HTTP 409.
+- **Atomic file writes**: `FileSystemProjectRepository` writes to a `.tmp` file then atomically renames to prevent partial reads during concurrent access.
+- **Metrics**: `MigrationMetrics` exposes Micrometer counters and timers (`ml.docs.written`, `ml.write.errors`, `ml.write.duration`) scraped by Prometheus via `/actuator/prometheus`.
 - **SPA routing**: `SpaController` forwards unmatched paths to `index.html` so the React app handles client-side routing.
 - **Credentials**: Passwords are AES-256-GCM encrypted at rest and never returned to the frontend. The encryption service is idempotent — values already prefixed with `ENC:` are stored unchanged.
 - **Package portability**: Migration packages contain no passwords. `ENC:` values supplied at import time are machine-local and not transferable between installations.
 - **CORS**: Configured for `http://localhost:5176` and `http://localhost:3000` (dev servers).
+
+---
+
+## Observability
+
+A local monitoring stack (Prometheus + Grafana) is bundled in the `docker/` directory.
+
+### Running the Stack
+
+```bash
+cd docker
+docker compose up -d
+```
+
+| Service | URL |
+|---------|-----|
+| Prometheus | http://localhost:9090 |
+| Grafana | http://localhost:3000 (admin / admin) |
+
+Prometheus scrapes the Spring Boot actuator endpoint at `http://host.docker.internal:9390/actuator/prometheus` every 5 seconds. The pre-provisioned Grafana dashboard shows documents written, write errors, and write latency in real time.
+
+> **Note:** The Spring Boot app runs outside Docker. Start the JAR first, then bring up the compose stack.
 
 ## Docs
 
