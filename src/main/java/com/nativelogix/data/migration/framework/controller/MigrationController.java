@@ -2,6 +2,7 @@ package com.nativelogix.data.migration.framework.controller;
 
 import com.nativelogix.data.migration.framework.model.marklogic.MarkLogicSecurityConfig;
 import com.nativelogix.data.migration.framework.model.migration.DeploymentJob;
+import com.nativelogix.data.migration.framework.model.migration.DryRunReport;
 import com.nativelogix.data.migration.framework.model.migration.MigrationPreviewResult;
 import com.nativelogix.data.migration.framework.model.migration.MigrationProgress;
 import com.nativelogix.data.migration.framework.model.migration.MigrationRequest;
@@ -71,6 +72,31 @@ public class MigrationController {
         return migrationJobService.getProgress(id)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    /**
+     * Runs a dry-run sample: exercises the full pipeline on a small row sample without writing to MarkLogic.
+     * Returns sample documents, pipeline errors, and estimated throughput.
+     */
+    @PostMapping("/v1/migration/jobs/{id}/dry-run-sample")
+    public ResponseEntity<DryRunReport> dryRunSample(@PathVariable String id) {
+        try {
+            return ResponseEntity.ok(migrationJobService.runDryRunSample(id));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    /** Retry a FAILED or PARTIALLY_COMPLETED job — launches a new job with the same parameters */
+    @PostMapping("/v1/migration/jobs/{id}/retry")
+    public ResponseEntity<DeploymentJob> retryJob(@PathVariable String id) {
+        try {
+            return ResponseEntity.ok(migrationJobService.retryJob(id));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalStateException e) {
+            return ResponseEntity.badRequest().build();
+        }
     }
 
     /** Delete a completed or failed job record */

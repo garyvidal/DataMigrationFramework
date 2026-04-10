@@ -62,18 +62,19 @@ class JsonDocumentBuilderTest {
     // ── Basic structure ───────────────────────────────────────────────────────
 
     @Test
-    void build_emptyMapping_returnsEmptyObject() throws Exception {
+    void build_emptyMapping_returnsDocumentWithRootKey() throws Exception {
         String json = builder.build(rootMapping("root", List.of()), Map.of(), null, null);
-        JsonNode node = parse(json);
-        assertTrue(node.isObject());
-        assertEquals(0, node.size());
+        JsonNode doc = parse(json);
+        assertTrue(doc.isObject());
+        assertTrue(doc.has("root"));
+        assertEquals(0, doc.get("root").size());
     }
 
     @Test
     void build_simpleStringColumn_emitsProperty() throws Exception {
         JsonTableMapping mapping = rootMapping("root", List.of(col("first_name", "firstName")));
         String json = builder.build(mapping, Map.of("first_name", "Gary"), null, null);
-        assertEquals("Gary", parse(json).get("firstName").asText());
+        assertEquals("Gary", parse(json).get("root").get("firstName").asText());
     }
 
     @Test
@@ -82,14 +83,14 @@ class JsonDocumentBuilderTest {
         row.put("middle_name", null);
         JsonTableMapping mapping = rootMapping("root", List.of(col("middle_name", "middleName")));
         String json = builder.build(mapping, row, null, null);
-        assertFalse(parse(json).has("middleName"));
+        assertFalse(parse(json).get("root").has("middleName"));
     }
 
     @Test
     void build_missingColumnKey_skipsProperty() throws Exception {
         JsonTableMapping mapping = rootMapping("root", List.of(col("missing", "missing")));
         String json = builder.build(mapping, Map.of(), null, null);
-        assertFalse(parse(json).has("missing"));
+        assertFalse(parse(json).get("root").has("missing"));
     }
 
     @Test
@@ -104,7 +105,7 @@ class JsonDocumentBuilderTest {
     void build_numberTypeFromInteger_emitsNumericNode() throws Exception {
         JsonTableMapping mapping = rootMapping("root", List.of(typedCol("qty", "quantity", "number")));
         String json = builder.build(mapping, Map.of("qty", 42), null, null);
-        JsonNode node = parse(json).get("quantity");
+        JsonNode node = parse(json).get("root").get("quantity");
         assertTrue(node.isNumber());
         assertEquals(42, node.asInt());
     }
@@ -113,7 +114,7 @@ class JsonDocumentBuilderTest {
     void build_numberTypeFromBigDecimal_emitsNumericNode() throws Exception {
         JsonTableMapping mapping = rootMapping("root", List.of(typedCol("price", "price", "number")));
         String json = builder.build(mapping, Map.of("price", new BigDecimal("19.99")), null, null);
-        JsonNode node = parse(json).get("price");
+        JsonNode node = parse(json).get("root").get("price");
         assertTrue(node.isNumber());
         assertEquals(new BigDecimal("19.99"), node.decimalValue());
     }
@@ -122,7 +123,7 @@ class JsonDocumentBuilderTest {
     void build_booleanTypeFromBoolean_emitsBooleanNode() throws Exception {
         JsonTableMapping mapping = rootMapping("root", List.of(typedCol("active", "active", "boolean")));
         String json = builder.build(mapping, Map.of("active", true), null, null);
-        JsonNode node = parse(json).get("active");
+        JsonNode node = parse(json).get("root").get("active");
         assertTrue(node.isBoolean());
         assertTrue(node.asBoolean());
     }
@@ -131,21 +132,21 @@ class JsonDocumentBuilderTest {
     void build_booleanTypeFromOne_emitsTrue() throws Exception {
         JsonTableMapping mapping = rootMapping("root", List.of(typedCol("flag", "flag", "boolean")));
         String json = builder.build(mapping, Map.of("flag", "1"), null, null);
-        assertTrue(parse(json).get("flag").asBoolean());
+        assertTrue(parse(json).get("root").get("flag").asBoolean());
     }
 
     @Test
     void build_dateFromSqlDate_formatsAsIsoDate() throws Exception {
         JsonTableMapping mapping = rootMapping("root", List.of(col("dob", "dateOfBirth")));
         String json = builder.build(mapping, Map.of("dob", Date.valueOf("2000-06-15")), null, null);
-        assertEquals("2000-06-15", parse(json).get("dateOfBirth").asText());
+        assertEquals("2000-06-15", parse(json).get("root").get("dateOfBirth").asText());
     }
 
     @Test
     void build_dateFromLocalDate_formatsAsIsoDate() throws Exception {
         JsonTableMapping mapping = rootMapping("root", List.of(col("dob", "dateOfBirth")));
         String json = builder.build(mapping, Map.of("dob", LocalDate.of(1990, 1, 1)), null, null);
-        assertEquals("1990-01-01", parse(json).get("dateOfBirth").asText());
+        assertEquals("1990-01-01", parse(json).get("root").get("dateOfBirth").asText());
     }
 
     @Test
@@ -153,7 +154,7 @@ class JsonDocumentBuilderTest {
         JsonTableMapping mapping = rootMapping("root", List.of(col("created", "createdAt")));
         LocalDateTime ldt = LocalDateTime.of(2024, 3, 15, 10, 30, 0);
         String json = builder.build(mapping, Map.of("created", Timestamp.valueOf(ldt)), null, null);
-        assertEquals("2024-03-15T10:30:00", parse(json).get("createdAt").asText());
+        assertEquals("2024-03-15T10:30:00", parse(json).get("root").get("createdAt").asText());
     }
 
     // ── Custom (JS) column functions ──────────────────────────────────────────
@@ -163,7 +164,7 @@ class JsonDocumentBuilderTest {
         JsonColumnMapping custom = customCol("fullName", "row.first_name + ' ' + row.last_name");
         JsonTableMapping mapping = rootMapping("root", List.of(custom));
         String json = builder.build(mapping, Map.of("first_name", "Jane", "last_name", "Doe"), null, null);
-        assertEquals("Jane Doe", parse(json).get("fullName").asText());
+        assertEquals("Jane Doe", parse(json).get("root").get("fullName").asText());
     }
 
     @Test
@@ -171,7 +172,7 @@ class JsonDocumentBuilderTest {
         JsonColumnMapping custom = customCol("optional", "null");
         JsonTableMapping mapping = rootMapping("root", List.of(custom));
         String json = builder.build(mapping, Map.of(), null, null);
-        assertFalse(parse(json).has("optional"));
+        assertFalse(parse(json).get("root").has("optional"));
     }
 
     // ── Array child mapping ───────────────────────────────────────────────────
@@ -191,7 +192,7 @@ class JsonDocumentBuilderTest {
                 new JsonDocumentBuilder.MappedRow(Map.of("item_id", "B2", "qty", "5"), null)
         ));
 
-        JsonNode node = parse(builder.build(root, Map.of("order_id", "ORD-1"), childData, null));
+        JsonNode node = parse(builder.build(root, Map.of("order_id", "ORD-1"), childData, null)).get("root");
 
         assertTrue(node.get("items").isArray());
         assertEquals(2, node.get("items").size());
@@ -211,7 +212,7 @@ class JsonDocumentBuilderTest {
         Map<JsonTableMapping, List<JsonDocumentBuilder.MappedRow>> childData = new LinkedHashMap<>();
         childData.put(child, List.of());
 
-        JsonNode node = parse(builder.build(root, Map.of(), childData, null));
+        JsonNode node = parse(builder.build(root, Map.of(), childData, null)).get("root");
         assertTrue(node.get("tags").isArray());
         assertEquals(0, node.get("tags").size());
     }
@@ -232,7 +233,7 @@ class JsonDocumentBuilderTest {
                 new JsonDocumentBuilder.MappedRow(Map.of("city", "Portland", "zip", "97201"), null)
         ));
 
-        JsonNode node = parse(builder.build(root, Map.of("id", "1"), childData, null));
+        JsonNode node = parse(builder.build(root, Map.of("id", "1"), childData, null)).get("root");
         JsonNode address = node.get("address");
         assertNotNull(address);
         assertTrue(address.isObject());
@@ -252,7 +253,7 @@ class JsonDocumentBuilderTest {
         Map<JsonTableMapping, List<JsonDocumentBuilder.MappedRow>> childData = new LinkedHashMap<>();
         childData.put(child, List.of());  // no matching rows
 
-        JsonNode node = parse(builder.build(root, Map.of(), childData, null));
+        JsonNode node = parse(builder.build(root, Map.of(), childData, null)).get("root");
         assertTrue(node.get("profile").isNull());
     }
 
@@ -273,9 +274,9 @@ class JsonDocumentBuilderTest {
                 new JsonDocumentBuilder.MappedRow(Map.of("city", "Seattle"), null)
         ));
 
-        JsonNode node = parse(builder.build(root, Map.of("id", "1"), childData, null));
+        JsonNode node = parse(builder.build(root, Map.of("id", "1"), childData, null)).get("root");
 
-        // city should be a top-level property, not nested under "addressBlock"
+        // city should be a top-level property under root, not nested under "addressBlock"
         assertEquals("Seattle", node.get("city").asText());
         assertFalse(node.has("addressBlock"));
     }
@@ -306,7 +307,7 @@ class JsonDocumentBuilderTest {
                 new JsonDocumentBuilder.MappedRow(Map.of("dept_name", "Engineering"), grandchildData)
         ));
 
-        JsonNode node = parse(builder.build(root, Map.of("id", "42"), childData, null));
+        JsonNode node = parse(builder.build(root, Map.of("id", "42"), childData, null)).get("root");
 
         assertEquals("Engineering", node.get("department").get("name").asText());
         assertEquals("Alice", node.get("department").get("manager").get("name").asText());

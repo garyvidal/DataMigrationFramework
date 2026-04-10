@@ -26,9 +26,12 @@ import org.springframework.batch.repeat.RepeatStatus;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.lang.NonNull;
 
+import com.nativelogix.data.migration.framework.model.migration.JobError;
+
 import java.sql.*;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
@@ -99,6 +102,15 @@ public class CursorPipelineTasklet implements Tasklet {
     private final AtomicLong processedCounter;
     private final AtomicReference<Exception> firstError = new AtomicReference<>();
 
+    /** Cap on per-document errors collected; prevents unbounded growth on mass failures. */
+    private static final int MAX_DOC_ERRORS = 10_000;
+    private final AtomicInteger docErrorCount = new AtomicInteger(0);
+    /** Thread-safe list of per-document write failures; exposed to MigrationJobService after execution. */
+    private final List<JobError> failedDocErrors = new CopyOnWriteArrayList<>();
+
+    /** Returns document-level write failures collected during execution. */
+    public List<JobError> getFailedDocErrors() { return failedDocErrors; }
+
     public CursorPipelineTasklet(MigrationJobContext ctx,
                                   JDBCConnectionService jdbcConnectionService,
                                   SqlQueryBuilder sqlQueryBuilder,
@@ -157,6 +169,12 @@ public class CursorPipelineTasklet implements Tasklet {
                     metrics.mlWriteErrorCounter.increment(batch.getItems().length);
                     log.error("WriteBatcher batch failed: {}", ex.getMessage(), ex);
                     firstError.compareAndSet(null, new RuntimeException("MarkLogic write failed: " + ex.getMessage(), ex));
+                    String reason = ex.getMessage();
+                    for (var item : batch.getItems()) {
+                        if (docErrorCount.incrementAndGet() <= MAX_DOC_ERRORS) {
+                            failedDocErrors.add(new JobError(item.getTargetUri(), reason, null));
+                        }
+                    }
                 });
         dmm.startJob(batcher);
 

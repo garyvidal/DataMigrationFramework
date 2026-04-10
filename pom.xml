@@ -72,6 +72,12 @@
             <groupId>us.fatehi</groupId>
             <artifactId>schemacrawler</artifactId>
             <version>16.25.2</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-jdk14</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <!-- https://mvnrepository.com/artifact/org.postgresql/postgresql -->
         <dependency>
@@ -83,6 +89,12 @@
             <groupId>us.fatehi</groupId>
             <artifactId>schemacrawler-postgresql</artifactId>
             <version>16.25.2</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-jdk14</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <!-- https://mvnrepository.com/artifact/com.microsoft.sqlserver/mssql-jdbc -->
         <dependency>
@@ -94,6 +106,12 @@
             <groupId>us.fatehi</groupId>
             <artifactId>schemacrawler-sqlserver</artifactId>
             <version>16.25.2</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-jdk14</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <!-- Picocli - CLI argument parsing with ANSI colour support -->
         <dependency>
@@ -111,6 +129,12 @@
             <groupId>us.fatehi</groupId>
             <artifactId>schemacrawler-oracle</artifactId>
             <version>16.25.2</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-jdk14</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <!-- Source: https://mvnrepository.com/artifact/com.marklogic/marklogic-client-api -->
         <dependency>

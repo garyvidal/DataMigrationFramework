@@ -58,7 +58,8 @@ public class JsonDocumentBuilder {
                         Map<JsonTableMapping, List<MappedRow>> childData,
                         NamingCase casing) throws Exception {
 
-        ObjectNode root = objectMapper.createObjectNode();
+        ObjectNode document = objectMapper.createObjectNode();
+        ObjectNode root = document.putObject(rootMapping.getJsonName());
         applyColumns(root, rootMapping.getColumns(), rootRow, casing);
 
         if (childData != null) {
@@ -100,7 +101,7 @@ public class JsonDocumentBuilder {
             }
         }
 
-        return prettyWriter.writeValueAsString(root);
+        return prettyWriter.writeValueAsString(document);
     }
 
     // -------------------------------------------------------------------------

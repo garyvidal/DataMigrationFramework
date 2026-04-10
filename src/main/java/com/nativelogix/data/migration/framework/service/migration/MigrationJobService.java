@@ -88,6 +88,9 @@ public class MigrationJobService {
     @Value("${migration.pipeline.queue-capacity:8}")
     private int queueCapacity;
 
+    @Value("${migration.dryrun.sample-size:100}")
+    private int dryRunSampleSize;
+
     // ── SSE emitter registry ──────────────────────────────────────────────────
 
     /** Live processed-record counters for in-flight jobs; removed on job completion. */
@@ -247,6 +250,60 @@ public class MigrationJobService {
     public Optional<DeploymentJob> getJob(String jobId) { return jobRepository.findById(jobId); }
     public void deleteJob(String jobId)                  { jobRepository.delete(jobId); }
 
+    /**
+     * Retries a FAILED or PARTIALLY_COMPLETED job by launching a new full migration job
+     * with the same project, connections, security config, and transform settings.
+     * Returns the new job. The original job record is unchanged.
+     */
+    public DeploymentJob retryJob(String jobId) {
+        DeploymentJob original = jobRepository.findById(jobId)
+                .orElseThrow(() -> new IllegalArgumentException("Job not found: " + jobId));
+        if (original.getStatus() != DeploymentJobStatus.FAILED
+                && original.getStatus() != DeploymentJobStatus.PARTIALLY_COMPLETED) {
+            throw new IllegalStateException(
+                    "Job " + jobId + " cannot be retried — status is " + original.getStatus());
+        }
+        MigrationRequest request = new MigrationRequest();
+        request.setProjectId(original.getProjectId());
+        request.setSourceConnectionId(original.getSourceConnectionId());
+        request.setMarklogicConnectionId(original.getMarklogicConnectionId());
+        request.setDirectoryPath(original.getDirectoryPath());
+        request.setSecurityConfig(original.getSecurityConfig());
+        request.setTransformName(original.getTransformName());
+        request.setTransformParams(original.getTransformParams());
+        request.setDryRun(false);
+        log.info("Retrying job {} — launching new job from same parameters", jobId);
+        return startJob(request);
+    }
+
+    /**
+     * Runs a dry-run sample against an existing job's project configuration.
+     * Exercises the full pipeline (cursor → child fetch → document build) on
+     * {@code migration.dryrun.sample-size} rows (default 100) without writing to MarkLogic.
+     */
+    public com.nativelogix.data.migration.framework.model.migration.DryRunReport runDryRunSample(String jobId) {
+        DeploymentJob job = jobRepository.findById(jobId)
+                .orElseThrow(() -> new IllegalArgumentException("Job not found: " + jobId));
+
+        com.nativelogix.data.migration.framework.model.project.Project project =
+                projectRepository.findById(job.getProjectId())
+                .orElseThrow(() -> new IllegalArgumentException("Project not found: " + job.getProjectId()));
+
+        SavedMarkLogicConnection mlConn = resolveMarkLogicConnection(job.getMarklogicConnectionId());
+        SavedConnection sourceConn     = resolveSourceConnection(job.getSourceConnectionId(), project);
+        long totalRecords              = countRootRecords(project, sourceConn);
+
+        MigrationJobContext ctx = new MigrationJobContext(job, project, sourceConn, mlConn,
+                job.getDirectoryPath(), job.getSecurityConfig(),
+                job.getTransformName(), job.getTransformParams());
+
+        DryRunTasklet tasklet = new DryRunTasklet(ctx, jdbcConnectionService, sqlQueryBuilder,
+                joinResolver, xmlDocumentBuilder, jsonDocumentBuilder, dryRunSampleSize);
+
+        log.info("Running dry-run sample for job {} — sample size {}", jobId, dryRunSampleSize);
+        return tasklet.run(totalRecords);
+    }
+
     public Optional<MarkLogicSecurityConfig> getJobSecurity(String jobId) {
         return jobRepository.findById(jobId).map(DeploymentJob::getSecurityConfig);
     }
@@ -386,7 +443,7 @@ public class MigrationJobService {
 
         Job batchJob = new JobBuilder("migrationJob-" + jobId, batchJobRepository)
                 .start(step)
-                .listener(buildJobListener(jobId, processedCounter, startTimeRef))
+                .listener(buildJobListener(jobId, processedCounter, startTimeRef, tasklet))
                 .build();
 
         JobParameters params = new JobParametersBuilder()
@@ -416,7 +473,8 @@ public class MigrationJobService {
      * flushes SSE emitters, and cleans up per-job state.
      */
     private JobExecutionListener buildJobListener(String jobId, AtomicLong processedCounter,
-                                                   AtomicReference<OffsetDateTime> startTimeRef) {
+                                                   AtomicReference<OffsetDateTime> startTimeRef,
+                                                   CursorPipelineTasklet tasklet) {
         return new JobExecutionListener() {
             @Override
             public void beforeJob(@NonNull JobExecution jobExecution) {
@@ -436,13 +494,21 @@ public class MigrationJobService {
                 jobRepository.findById(jobId).ifPresent(job -> {
                     boolean anyFailed = jobExecution.getStepExecutions().stream()
                             .anyMatch(se -> se.getStatus() == BatchStatus.FAILED);
-                    job.setStatus(anyFailed ? DeploymentJobStatus.FAILED : DeploymentJobStatus.COMPLETED);
+                    var docErrors = tasklet.getFailedDocErrors();
                     if (anyFailed) {
+                        job.setStatus(DeploymentJobStatus.FAILED);
                         jobExecution.getStepExecutions().stream()
                                 .filter(se -> se.getStatus() == BatchStatus.FAILED)
                                 .flatMap(se -> se.getFailureExceptions().stream())
                                 .findFirst()
                                 .ifPresent(e -> job.setErrorMessage(e.getMessage()));
+                    } else if (!docErrors.isEmpty()) {
+                        job.setStatus(DeploymentJobStatus.PARTIALLY_COMPLETED);
+                    } else {
+                        job.setStatus(DeploymentJobStatus.COMPLETED);
+                    }
+                    if (!docErrors.isEmpty()) {
+                        job.setErrors(docErrors);
                     }
                     job.setProcessedRecords(processedCounter.get());
                     job.setEndTime(OffsetDateTime.now());

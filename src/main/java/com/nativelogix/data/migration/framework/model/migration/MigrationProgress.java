@@ -10,7 +10,7 @@ public class MigrationProgress {
     private long processedRecords;
     private long elapsedSeconds;
     private String errorMessage;
-    private List<String> errors;
+    private List<JobError> errors;
 
     public MigrationProgress() {}
 
@@ -32,6 +32,6 @@ public class MigrationProgress {
     public String getErrorMessage() { return errorMessage; }
     public void setErrorMessage(String errorMessage) { this.errorMessage = errorMessage; }
 
-    public List<String> getErrors() { return errors; }
-    public void setErrors(List<String> errors) { this.errors = errors; }
+    public List<JobError> getErrors() { return errors; }
+    public void setErrors(List<JobError> errors) { this.errors = errors; }
 }

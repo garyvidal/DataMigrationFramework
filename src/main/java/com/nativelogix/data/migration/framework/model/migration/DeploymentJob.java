@@ -26,7 +26,7 @@ public class DeploymentJob {
     private long totalRecords;
     private long processedRecords;
     private String errorMessage;
-    private List<String> errors = new ArrayList<>();
+    private List<JobError> errors = new ArrayList<>();
     private boolean dryRun = false;
     /** Name of a server-side MarkLogic REST transform to apply on ingest (optional). */
     private String transformName;
@@ -82,8 +82,8 @@ public class DeploymentJob {
     public String getErrorMessage() { return errorMessage; }
     public void setErrorMessage(String errorMessage) { this.errorMessage = errorMessage; }
 
-    public List<String> getErrors() { return errors; }
-    public void setErrors(List<String> errors) { this.errors = errors != null ? errors : new ArrayList<>(); }
+    public List<JobError> getErrors() { return errors; }
+    public void setErrors(List<JobError> errors) { this.errors = errors != null ? errors : new ArrayList<>(); }
 
     public boolean isDryRun() { return dryRun; }
     public void setDryRun(boolean dryRun) { this.dryRun = dryRun; }
